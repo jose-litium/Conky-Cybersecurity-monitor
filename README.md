@@ -73,3 +73,4 @@ journalctl -u conky.service
 ### Contributions
 
 ## Feel free to contribute, report bugs, or make suggestions! If you find any issues or have ideas for improvements, fork the repository, make changes, and submit a pull request.
+![Uploading image.png…]()
