@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # # Conky Cybersecurity Monitor Setup Guide
 
 # ## Key Features
