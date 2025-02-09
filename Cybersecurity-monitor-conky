@@ -1,70 +1,71 @@
 #!/bin/bash
 
-# Definir colores para mensajes
+# Define colors for messages
 GREEN='\033[0;32m'
 RED='\033[0;31m'
-NC='\033[0m' # Sin color
+NC='\033[0m'  # No color
 
-# Pedir contraseña sudo al inicio
-echo -e "${GREEN}Se requieren privilegios de administrador. Introduce tu contraseña:${NC}"
+# Request sudo privileges at the beginning
+echo -e "${GREEN}Administrator privileges are required. Please enter your password:${NC}"
 sudo -v
 
-# Comprobar si un paquete está instalado
+# Function to check if a package is installed; if not, install it
 function check_install() {
     dpkg -l | grep -qw "$1" || {
-        echo -e "${GREEN}Instalando $1...${NC}"
+        echo -e "${GREEN}Installing $1...${NC}"
         sudo apt install -y "$1"
     }
 }
 
-echo -e "${GREEN}Actualizando paquetes y verificando dependencias...${NC}"
+# Update package lists and verify dependencies
+echo -e "${GREEN}Updating packages and checking dependencies...${NC}"
 sudo apt update
 
-# Lista de aplicaciones necesarias
+# List of required packages
 APPS=("conky" "curl" "net-tools" "lsof" "xdg-utils" "rkhunter")
 
-# Instalar dependencias si no están presentes
+# Install dependencies if they are not already installed
 for APP in "${APPS[@]}"; do
     check_install "$APP"
 done
 
-# Configurar permisos para rkhunter
-echo -e "${GREEN}Configurando permisos para RKHunter...${NC}"
+# Configure permissions for rkhunter
+echo -e "${GREEN}Configuring permissions for RKHunter...${NC}"
 sudo chmod +r /var/log/rkhunter.log
 sudo usermod -aG adm $(whoami)
 
-# Configurar sudoers para evitar futuros prompts
-echo -e "${GREEN}Configurando sudoers para comandos de Conky...${NC}"
+# Configure sudoers file for Conky-related commands to avoid future password prompts
+echo -e "${GREEN}Configuring sudoers for Conky commands...${NC}"
 echo "$(whoami) ALL=(ALL) NOPASSWD: /bin/systemctl is-active ssh, /bin/systemctl is-active vpn, /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat" | sudo tee /etc/sudoers.d/conky > /dev/null
 sudo chmod 0440 /etc/sudoers.d/conky
 
-# Crear directorio de configuración si no existe
+# Create the Conky configuration directory if it does not exist
 mkdir -p ~/.config/conky
 
-# Copiar configuración de Conky
-echo -e "${GREEN}Copiando configuración de Conky...${NC}"
+# Copy the Conky configuration file
+echo -e "${GREEN}Copying Conky configuration...${NC}"
 cat <<EOL > ~/.config/conky/conky.conf
 conky.config = {
-    alignment = 'top_right',
-    background = false,
-    double_buffer = true,
-    update_interval = 1,
-    own_window = true,
-    own_window_type = 'desktop',
-    own_window_transparent = false,
-    own_window_argb_visual = true,
-    own_window_argb_value = 200,  -- Fondo semi-transparente
-    own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager',
-    gap_x = 10,
-    gap_y = 50,
-    minimum_width = 350,
-    minimum_height = 400,
-    draw_shades = false,
-    draw_borders = false,
-    use_xft = true,
-    default_color = 'white',
-    default_outline_color = 'black',
-    override_utf8_locale = true,
+    alignment = 'top_right',              # Align Conky to the top right corner
+    background = false,                   # Do not run as a background process
+    double_buffer = true,                 # Use double buffering to reduce flickering
+    update_interval = 1,                  # Update every 1 second
+    own_window = true,                    # Use a dedicated window for Conky
+    own_window_type = 'desktop',          # Set the window type to 'desktop'
+    own_window_transparent = false,       # Disable the old transparency method
+    own_window_argb_visual = true,        # Enable ARGB visuals (for modern transparency)
+    own_window_argb_value = 200,           # Set semi-transparent background (0-255)
+    own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager', # Window hints
+    gap_x = 10,                           # Horizontal gap from screen edge
+    gap_y = 50,                           # Vertical gap from screen edge
+    minimum_width = 350,                  # Minimum window width
+    minimum_height = 400,                 # Minimum window height
+    draw_shades = false,                  # Do not draw text shadows
+    draw_borders = false,                 # Do not draw window borders
+    use_xft = true,                       # Use Xft fonts for better quality
+    default_color = 'white',              # Default text color
+    default_outline_color = 'black',      # Outline color for text
+    override_utf8_locale = true,          # Force UTF-8 locale
 };
 
 conky.text = [[
@@ -78,8 +79,8 @@ ${color yellow}RAM: ${color lightblue}${memperc}% ${membar 10}
 ${color orange}UPTIME: ${color white}${uptime}
 
 ${color red}-- Network Information --
-${color white}IP Address (Local): ${color cyan}${execi 1 hostname -I | cut -d' ' -f1}
-${color white}IP Address (Public): ${color cyan}${execi 600 curl -s ifconfig.me}
+${color white}Local IP Address: ${color cyan}${execi 1 hostname -I | cut -d' ' -f1}
+${color white}Public IP Address: ${color cyan}${execi 600 curl -s ifconfig.me}
 ${color lightgreen}Network: Down: ${downspeedf wlp0s20f3} Up: ${upspeedf wlp0s20f3}
 
 ${color red}-- Active Connections & Ports --
@@ -90,13 +91,13 @@ ${color white}SSH Status: ${color red}${execi 1 systemctl is-active ssh}
 ${color white}VPN Status: ${color green}${execi 1 nmcli connection show --active | grep vpn | wc -l} VPN(s) active
 
 ${color orange}-- Disk and System Information --
-${color white}Disk Usage: ${color lightblue}${execi 1 df -h / | awk 'NR==2{print $5}'} Used
+${color white}Disk Usage: ${color lightblue}${execi 1 df -h / | awk 'NR==2{print \$5}'} Used
 
 ${color cyan}-- Top Processes (Highest CPU Usage) --
 ${color white}${execi 1 ps -eo pid,comm,%cpu --sort=-%cpu | head -n 6 | tail -n 5}
 
 ${color lightblue}Users Logged In:
-${color white}${execi 1 who | awk '{print $1}'}
+${color white}${execi 1 who | awk '{print \$1}'}
 
 ${color red}-- Rootkit Detection (Full Scan) --
 Full Rkhunter Scan: ${color yellow}${execi 600 grep -v "System clean" /tmp/rkhunter_result.txt | tail -n 5}
@@ -106,8 +107,14 @@ ${color lightgreen}xdg-open /tmp/rkhunter_warnings.txt
 ]];
 EOL
 
-# Crear un servicio systemd para iniciar Conky al inicio
-echo -e "${GREEN}Creando servicio de systemd para iniciar Conky automáticamente...${NC}"
+# Explanation:
+# This block creates the Conky configuration file at ~/.config/conky/conky.conf.
+# It sets various options for Conky (e.g., window type, colors, update intervals, etc.),
+# and defines the text output to display system information such as time, CPU usage, network data, etc.
+# It also filters warnings from the rkhunter log into /tmp/rkhunter_warnings.txt and shows a command to open it.
+
+# Create a systemd service file to start Conky on boot automatically
+echo -e "${GREEN}Creating systemd service to start Conky automatically...${NC}"
 cat <<EOL | sudo tee /etc/systemd/system/conky.service > /dev/null
 [Unit]
 Description=Conky system monitor
@@ -125,10 +132,15 @@ Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
 WantedBy=default.target
 EOL
 
-# Recargar systemd y habilitar el servicio
+# Explanation:
+# The above systemd service file ensures that Conky starts automatically after the network is available.
+# It uses the Conky configuration file we created and restarts Conky if it crashes.
+# The service runs under the current user with the necessary environment variables for graphical display.
+
+# Reload systemd configuration, enable and start the Conky service
 sudo systemctl daemon-reload
 sudo systemctl enable conky.service
 sudo systemctl start conky.service
 
-echo -e "${GREEN}Instalación completa. Conky está ejecutándose y se iniciará automáticamente al reiniciar.${NC}"
-
+# Final message indicating successful installation
+echo -e "${GREEN}Installation complete. Conky is now running and will start automatically on reboot.${NC}"
