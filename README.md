@@ -1,12 +1,12 @@
-#Conky Cybersecurity Monitor Setup Guide
+# Conky Cybersecurity Monitor Setup Guide
 
-# Key Features
+## Key Features
 
 # Automated Installation: The provided script updates your system, installs necessary packages, and handles all the configuration and permissions for you.
 # Systemd Auto-Start: Conky starts automatically whenever you boot your system.
 # Easy Customization: You can tweak the look, update intervals, and other settings in the Conky configuration file.
 
-# What You'll Need
+## What You'll Need
 
 # A Debian-based operating system (e.g., Ubuntu, Linux Mint)
 # Sudo privileges
