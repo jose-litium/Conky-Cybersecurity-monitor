@@ -1,0 +1,134 @@
+#!/bin/bash
+
+# Definir colores para mensajes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # Sin color
+
+# Pedir contraseña sudo al inicio
+echo -e "${GREEN}Se requieren privilegios de administrador. Introduce tu contraseña:${NC}"
+sudo -v
+
+# Comprobar si un paquete está instalado
+function check_install() {
+    dpkg -l | grep -qw "$1" || {
+        echo -e "${GREEN}Instalando $1...${NC}"
+        sudo apt install -y "$1"
+    }
+}
+
+echo -e "${GREEN}Actualizando paquetes y verificando dependencias...${NC}"
+sudo apt update
+
+# Lista de aplicaciones necesarias
+APPS=("conky" "curl" "net-tools" "lsof" "xdg-utils" "rkhunter")
+
+# Instalar dependencias si no están presentes
+for APP in "${APPS[@]}"; do
+    check_install "$APP"
+done
+
+# Configurar permisos para rkhunter
+echo -e "${GREEN}Configurando permisos para RKHunter...${NC}"
+sudo chmod +r /var/log/rkhunter.log
+sudo usermod -aG adm $(whoami)
+
+# Configurar sudoers para evitar futuros prompts
+echo -e "${GREEN}Configurando sudoers para comandos de Conky...${NC}"
+echo "$(whoami) ALL=(ALL) NOPASSWD: /bin/systemctl is-active ssh, /bin/systemctl is-active vpn, /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat" | sudo tee /etc/sudoers.d/conky > /dev/null
+sudo chmod 0440 /etc/sudoers.d/conky
+
+# Crear directorio de configuración si no existe
+mkdir -p ~/.config/conky
+
+# Copiar configuración de Conky
+echo -e "${GREEN}Copiando configuración de Conky...${NC}"
+cat <<EOL > ~/.config/conky/conky.conf
+conky.config = {
+    alignment = 'top_right',
+    background = false,
+    double_buffer = true,
+    update_interval = 1,
+    own_window = true,
+    own_window_type = 'desktop',
+    own_window_transparent = false,
+    own_window_argb_visual = true,
+    own_window_argb_value = 200,  -- Fondo semi-transparente
+    own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager',
+    gap_x = 10,
+    gap_y = 50,
+    minimum_width = 350,
+    minimum_height = 400,
+    draw_shades = false,
+    draw_borders = false,
+    use_xft = true,
+    default_color = 'white',
+    default_outline_color = 'black',
+    override_utf8_locale = true,
+};
+
+conky.text = [[
+${color cyan}${time %H:%M:%S}  ${color white}Vietnam Local Time (GMT+7)
+${color lightgreen}${execi 1 TZ='Europe/Madrid' date '+%H:%M:%S'}  Spain (GMT+1)
+${color yellow}${execi 1 TZ='Asia/Shanghai' date '+%H:%M:%S'}  China (GMT+8)
+${color magenta}${execi 1 TZ='America/New_York' date '+%H:%M:%S'}  New York (GMT-5)
+
+${color lightblue}CPU: ${if_match ${cpu cpu0} > 80}${color red}${cpu cpu0}%${else}${color green}${cpu cpu0}%${endif} ${cpubar cpu0 10,}
+${color yellow}RAM: ${color lightblue}${memperc}% ${membar 10}
+${color orange}UPTIME: ${color white}${uptime}
+
+${color red}-- Network Information --
+${color white}IP Address (Local): ${color cyan}${execi 1 hostname -I | cut -d' ' -f1}
+${color white}IP Address (Public): ${color cyan}${execi 600 curl -s ifconfig.me}
+${color lightgreen}Network: Down: ${downspeedf wlp0s20f3} Up: ${upspeedf wlp0s20f3}
+
+${color red}-- Active Connections & Ports --
+${color white}Active Connections: ${color yellow}${execi 1 sudo netstat -an | grep ESTABLISHED | wc -l}
+${color white}Listening Ports: ${color yellow}${execi 1 sudo netstat -tuln | grep LISTEN | wc -l}
+${color white}Open Ports: ${color cyan}${execi 1 sudo lsof -i -P -n | grep LISTEN | wc -l} Total
+${color white}SSH Status: ${color red}${execi 1 systemctl is-active ssh}
+${color white}VPN Status: ${color green}${execi 1 nmcli connection show --active | grep vpn | wc -l} VPN(s) active
+
+${color orange}-- Disk and System Information --
+${color white}Disk Usage: ${color lightblue}${execi 1 df -h / | awk 'NR==2{print $5}'} Used
+
+${color cyan}-- Top Processes (Highest CPU Usage) --
+${color white}${execi 1 ps -eo pid,comm,%cpu --sort=-%cpu | head -n 6 | tail -n 5}
+
+${color lightblue}Users Logged In:
+${color white}${execi 1 who | awk '{print $1}'}
+
+${color red}-- Rootkit Detection (Full Scan) --
+Full Rkhunter Scan: ${color yellow}${execi 600 grep -v "System clean" /tmp/rkhunter_result.txt | tail -n 5}
+${execi 900 bash -c 'grep -i "warning" /var/log/rkhunter.log > /tmp/rkhunter_warnings.txt'}
+${color white}-- Warnings Log --
+${color lightgreen}xdg-open /tmp/rkhunter_warnings.txt
+]];
+EOL
+
+# Crear un servicio systemd para iniciar Conky al inicio
+echo -e "${GREEN}Creando servicio de systemd para iniciar Conky automáticamente...${NC}"
+cat <<EOL | sudo tee /etc/systemd/system/conky.service > /dev/null
+[Unit]
+Description=Conky system monitor
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/conky -c /home/$USER/.config/conky/conky.conf
+Restart=always
+User=$USER
+Group=$USER
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
+
+[Install]
+WantedBy=default.target
+EOL
+
+# Recargar systemd y habilitar el servicio
+sudo systemctl daemon-reload
+sudo systemctl enable conky.service
+sudo systemctl start conky.service
+
+echo -e "${GREEN}Instalación completa. Conky está ejecutándose y se iniciará automáticamente al reiniciar.${NC}"
+
