@@ -1,4 +1,3 @@
-cat << 'EOF' > README.md
 # Conky Setup Script
 
 This repository contains an automated installation script to configure Conky, a system monitoring tool. The script performs the following tasks:
@@ -34,9 +33,3 @@ This repository contains an automated installation script to configure Conky, a 
    ```bash
    git clone https://github.com/jose-litium/conky-setup.git
    cd conky-setup
-
-
-
-  
-
-
