@@ -1,35 +1,113 @@
-# Conky Setup Script
+#!/bin/bash
 
-This repository contains an automated installation script to configure Conky, a system monitoring tool. The script performs the following tasks:
+# # Conky Cybersecurity Monitor Setup Guide
 
-- **Installs the necessary dependencies:**  
-  Ensures that Conky, curl, net-tools, lsof, xdg-utils, and rkhunter are installed.
-- **Configures permissions and sudoers:**  
-  Adjusts the permissions of `/var/log/rkhunter.log` and adds the user to the `adm` group for proper rkhunter functionality. It also sets up a sudoers file so that certain commands run without requiring a password.
-- **Copies a custom Conky configuration:**  
-  Generates the configuration file at `~/.config/conky/conky.conf` with predefined parameters (such as position, colors, update intervals, and more).
-- **Creates a systemd service:**  
-  Sets up and enables a service to ensure that Conky automatically starts when the system boots.
+## Key Features
 
-## Features
+# - **Automated Installation:** The provided script updates your system, installs necessary packages, and handles all the configuration and permissions for you.
+# - **Systemd Auto-Start:** Conky starts automatically every time you boot your system.
+# - **Easy Customization:** You can tweak the look, update intervals, and other settings in the Conky configuration file.
 
-- **Automated Installation:**  
-  The script updates the system, installs the required packages, and configures the necessary permissions.
-- **Auto-start with systemd:**  
-  Conky will automatically launch at every system boot.
-- **Easy Customization:**  
-  The Conky configuration is stored in `~/.config/conky/conky.conf`, allowing you to edit it to your liking.
+## What You'll Need
 
-## Requirements
+# - A Debian-based operating system (e.g., Ubuntu, Linux Mint)
+# - Sudo privileges
 
-- A Debian-based operating system (e.g., Ubuntu, Linux Mint).
-- Sudo privileges.
+## How to Install and Use
 
-## Installation and Usage
+### Clone the Repository:
+# ```bash
+# git clone [https://github.com/jose-litium/Conky-Cybersecurity-monitor.git](https://github.com/jose-litium/Conky-Cybersecurity-monitor.git)
+# ```
+git clone https://github.com/jose-litium/Conky-Cybersecurity-monitor.git
 
-1. **Clone the repository:**
+### Navigate to the Directory:
+# ```bash
+# cd Conky-Cybersecurity-monitor
+# ```
+cd Conky-Cybersecurity-monitor
 
-   Open a terminal and run:
-   ```bash
-   git clone https://github.com/jose-litium/conky-setup.git
-   cd conky-setup
+### Make the Installation Script Executable:
+# ```bash
+# chmod +x install_conky.sh
+# ```
+chmod +x install_conky.sh
+
+### Run the Installation Script:
+# ```bash
+# ./install_conky.sh
+# ```
+./install_conky.sh
+# The script will ask for your sudo password and then:
+# - Update your system and install dependencies.
+# - Set up permissions and create a sudoers file.
+# - Copy the Conky configuration to ~/.config/conky/conky.conf.
+# - Create and enable a systemd service to auto-start Conky.
+
+## Changing Privileges and Customization
+
+### Modifying File Permissions:
+# The script handles file permissions for `/var/log/rkhunter.log` and sets up a sudoers file.
+# You can manually edit these by editing the sudoers file:
+# ```bash
+# sudo nano /etc/sudoers.d/conky
+# ```
+# sudo nano /etc/sudoers.d/conky
+
+# After making changes, ensure correct permissions:
+# ```bash
+# sudo chmod 0440 /etc/sudoers.d/conky
+# ```
+# sudo chmod 0440 /etc/sudoers.d/conky
+
+### Customizing the Conky Configuration:
+# The Conky configuration file is located at `~/.config/conky/conky.conf`.
+# Edit it to change position, colors, update intervals, and more:
+# ```bash
+# nano ~/.config/conky/conky.conf
+# ```
+# nano ~/.config/conky/conky.conf
+
+# Save changes and restart the Conky service to apply (explained below).
+
+## Managing the Systemd Service
+
+### Check Service Status:
+# ```bash
+# systemctl status conky.service
+# ```
+systemctl status conky.service
+
+### Restart the Service:
+# ```bash
+# sudo systemctl restart conky.service
+# ```
+sudo systemctl restart conky.service
+
+### View Logs:
+# ```bash
+# journalctl -u conky.service
+# ```
+journalctl -u conky.service
+
+## Troubleshooting
+
+### Conky Doesn't Start:
+# Check the service status using:
+# ```bash
+# systemctl status conky.service
+# ```
+# systemctl status conky.service
+# Look for error messages and ensure dependencies are installed.
+
+### Permission Issues or Missing Dependencies:
+# Manually install missing packages:
+# ```bash
+# sudo apt install conky curl net-tools lsof xdg-utils rkhunter
+# ```
+# sudo apt install conky curl net-tools lsof xdg-utils rkhunter
+# Ensure your user is added to the adm group and that permissions on `/var/log/rkhunter.log` are correct.
+
+## Contributions
+
+# Feel free to contribute, report bugs, or make suggestions! If you find any issues or have ideas for improvements, fork the repository, make changes, and submit a pull request.
