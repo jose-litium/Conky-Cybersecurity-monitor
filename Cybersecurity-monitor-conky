@@ -164,12 +164,12 @@ conky.text = [[
 \${color white}Uptime: \${color yellow}\${uptime}
 
 \${color magenta}------ Network Info ------
-\${color white}Local IP: \${color cyan}\${execi 10 hostname -I | cut -d' ' -f1} \${color #CCCCCC} *IP L.:hostname -I | cut -d' ' -f1
+\${color white}Local IP: \${color cyan}\${execi 10 hostname -I | cut -d' ' -f1} \${color #CCCCCC} *IP L.: hostname -I | cut -d' ' -f1
 \${color white}Public IP: \${color cyan}\${execi 600 curl -s ifconfig.me} \${color #CCCCCC} *Curl -s ifconfig.me
 \${color white}VPN: \${color yellow}\${execi 30 bash -c "if [ \$(nmcli -t -f type connection show --active | grep -ic vpn) -eq 0 ]; then echo 'inactive'; else echo 'active'; fi"} \${color #CCCCCC} *nmcli -t -f type connection show --active
 \${color white}SSH Status: \${color yellow}\${execi 30 systemctl is-active ssh} \${color #CCCCCC} *systemctl is-active ssh
-\${color white}Established Connections: \${color red}\${execi 30 netstat -an | grep ESTABLECIDO | wc -l} \${color #CCCCCC} *netstat -an | grep ESTABLISHED
-\${color white}Open Ports: \${color red}\${execi 30 netstat -tuln | grep ESCUCHA | wc -l}   \${color #CCCCCC} *netstat -tuln | grep LISEN | wc -l
+\${color white}Established Connections: \${color red}\${execi 10 netstat -an | grep ESTABLECIDO | wc -l} \${color #CCCCCC} *netstat -an | grep ESTABLISHED
+\${color white}Open Ports: \${color red}\${execi 10 netstat -tuln | grep ESCUCHA | wc -l}   \${color #CCCCCC} *netstat -tuln | grep LISEN | wc -l
 
 \${color magenta}------ Logged Users ------
 \${color white}Users: \${color cyan}\${execi 30 who | awk '{print \$1}' | sort | uniq | xargs}
@@ -380,39 +380,54 @@ function restore_system() {
 
 # ------------------------------------------------------------------------------
 # Function: install_rkhunter_service
-#   Installs a system-wide systemd service to automatically run the RKHunter scan at boot.
+#   Installs a system-wide systemd service and timer to automatically run the
+#   RKHunter scan at boot and every 10 minutes thereafter.
 # ------------------------------------------------------------------------------
 function install_rkhunter_service() {
     echo -e "${BLUE}Installing automatic RKHunter scan service...${NC}"
     sudo tee /etc/systemd/system/rkhunter-auto.service > /dev/null <<EOL
 [Unit]
-Description=Automatic RKHunter Scan at Boot
-After=network.target
+Description=Automatic RKHunter Scan
 
 [Service]
 Type=oneshot
 ExecStart=/bin/bash -c 'rkhunter --update > /dev/null 2>&1 && rkhunter --propupd > /dev/null 2>&1 && rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null && grep -i "warning" /tmp/rkhunter_result.txt > /tmp/rkhunter_warnings.txt'
 RemainAfterExit=yes
+EOL
+
+    # Create a timer unit to run the service every 10 minutes (adjustable)
+    sudo tee /etc/systemd/system/rkhunter-auto.timer > /dev/null <<EOL
+[Unit]
+Description=Timer for Automatic RKHunter Scan
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=timers.target
 EOL
+
     sudo systemctl daemon-reload
-    sudo systemctl enable rkhunter-auto.service
-    echo -e "${GREEN}Automatic RKHunter scan service installed.${NC}"
+    sudo systemctl enable rkhunter-auto.timer
+    sudo systemctl start rkhunter-auto.timer
+    echo -e "${GREEN}Automatic RKHunter scan service and timer installed.${NC}"
     echo -e "${YELLOW}Warnings log: /tmp/rkhunter_warnings.txt${NC}"
 }
 
 # ------------------------------------------------------------------------------
 # Function: remove_rkhunter_service
-#   Removes the automatic RKHunter scan service.
+#   Removes the automatic RKHunter scan service and timer.
 # ------------------------------------------------------------------------------
 function remove_rkhunter_service() {
-    echo -e "${RED}Removing automatic RKHunter scan service...${NC}"
+    echo -e "${RED}Removing automatic RKHunter scan service and timer...${NC}"
+    sudo systemctl disable rkhunter-auto.timer
+    sudo systemctl stop rkhunter-auto.timer
+    sudo rm -f /etc/systemd/system/rkhunter-auto.timer
     sudo systemctl disable rkhunter-auto.service
     sudo rm -f /etc/systemd/system/rkhunter-auto.service
     sudo systemctl daemon-reload
-    echo -e "${GREEN}Automatic RKHunter scan service removed.${NC}"
+    echo -e "${GREEN}Automatic RKHunter scan service and timer removed.${NC}"
 }
 
 # ------------------------------------------------------------------------------
