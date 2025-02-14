@@ -1,146 +1,461 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Conky Installation & Management Script (User Systemd Service + Menu)
+# with Automatic RKHunter Scan, Enhanced Indicators (including Disk Usage,
+# VPN/SSH detection), and Elegant Design
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Define colors for messages
-GREEN='\033[0;32m'
-RED='\033[0;31m'
+# -- COLORS --------------------------------------------------------------------
+BLUE='\033[1;34m'
+CYAN='\033[1;36m'
+GREEN='\033[1;32m'
+MAGENTA='\033[1;35m'
+YELLOW='\033[1;33m'
+WHITE='\033[1;37m'
+RED='\033[1;31m'
 NC='\033[0m'  # No color
 
-# Request sudo privileges at the beginning
-echo -e "${GREEN}Administrator privileges are required. Please enter your password:${NC}"
-sudo -v
+# Define installation directory for helper scripts
+INSTALL_DIR="$HOME/.local/conky_app"
+mkdir -p "$INSTALL_DIR"
 
-# Function to check if a package is installed; if not, install it
-function check_install() {
-    dpkg -l | grep -qw "$1" || {
-        echo -e "${GREEN}Installing $1...${NC}"
-        sudo apt install -y "$1"
-    }
+# ------------------------------------------------------------------------------
+# Request sudo privileges at the beginning for install/uninstall tasks
+# ------------------------------------------------------------------------------
+echo -e "${BLUE}Administrator privileges are required (for installing packages).${NC}"
+sudo -v || { echo -e "${RED}Could not obtain sudo privileges. Exiting...${NC}"; exit 1; }
+
+# ------------------------------------------------------------------------------
+# Ask user for confirmation (Yes/No)
+# ------------------------------------------------------------------------------
+function confirm() {
+    while true; do
+        echo -en "${CYAN}$1 [Y/n] ${NC}"
+        read -r choice
+        case "$choice" in
+            [Yy]*|"" ) return 0 ;;
+            [Nn]* ) return 1 ;;
+            * ) echo -e "${RED}Please answer yes or no.${NC}" ;;
+        esac
+    done
 }
 
-# Update package lists and verify dependencies
-echo -e "${GREEN}Updating packages and checking dependencies...${NC}"
-sudo apt update
+# ------------------------------------------------------------------------------
+# Check if user-level systemd is available
+# ------------------------------------------------------------------------------
+function check_user_systemd() {
+    if ! systemctl --user 2>/dev/null; then
+        echo -e "${RED}User-level systemd not available. Please use a system with user systemd support (Ubuntu 18.04+).${NC}"
+        exit 1
+    fi
+}
 
-# List of required packages
-APPS=("conky" "curl" "net-tools" "lsof" "xdg-utils" "rkhunter")
+# ------------------------------------------------------------------------------
+# Function: check_install
+#   Checks if a package is installed; if not, asks to install it.
+# ------------------------------------------------------------------------------
+function check_install() {
+    local pkg="$1"
+    if dpkg -l | grep -qw "$pkg"; then
+        echo -e "${GREEN}$pkg is already installed.${NC}"
+    else
+        echo -e "${CYAN}$pkg is not installed.${NC}"
+        if confirm "Do you want to install $pkg?"; then
+            sudo apt install -y "$pkg"
+        else
+            echo -e "${RED}Skipping installation of $pkg. This may break some functionality.${NC}"
+        fi
+    fi
+}
 
-# Install dependencies if they are not already installed
-for APP in "${APPS[@]}"; do
-    check_install "$APP"
-done
+# ------------------------------------------------------------------------------
+# Function: create_rkhunter_scan_script
+#   Creates a helper script for RKHunter scan so that each time Conky starts,
+#   a background scan refreshes the warnings file.
+# ------------------------------------------------------------------------------
+function create_rkhunter_scan_script() {
+    local SCRIPT="$INSTALL_DIR/rkhunter_scan.sh"
+    cat <<'EOF' > "$SCRIPT"
+#!/usr/bin/env bash
+sudo rkhunter --update > /dev/null 2>&1 && \
+sudo rkhunter --propupd > /dev/null 2>&1 && \
+sudo rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null && \
+grep -i "warning" /tmp/rkhunter_result.txt > /tmp/rkhunter_warnings.txt
+EOF
+    chmod +x "$SCRIPT"
+}
 
-# Configure permissions for rkhunter
-echo -e "${GREEN}Configuring permissions for RKHunter...${NC}"
-sudo chmod +r /var/log/rkhunter.log
-sudo usermod -aG adm $(whoami)
+# ------------------------------------------------------------------------------
+# Function: install_conky
+#   Installs conky-all and its dependencies, configures RKHunter,
+#   creates a user-level systemd service for Conky, and starts it.
+# ------------------------------------------------------------------------------
+function install_conky() {
+    if ! confirm "Proceed with Conky installation and setup?"; then
+        echo -e "${RED}Installation aborted by user.${NC}"
+        return
+    fi
+    check_user_systemd
+    echo -e "${BLUE}Updating package lists...${NC}"
+    sudo apt update
 
-# Configure sudoers file for Conky-related commands to avoid future password prompts
-echo -e "${GREEN}Configuring sudoers for Conky commands...${NC}"
-echo "$(whoami) ALL=(ALL) NOPASSWD: /bin/systemctl is-active ssh, /bin/systemctl is-active vpn, /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat" | sudo tee /etc/sudoers.d/conky > /dev/null
-sudo chmod 0440 /etc/sudoers.d/conky
+    # Required packages for Conky functionality
+    local APPS=("conky-all" "curl" "net-tools" "lsof" "xdg-utils" "rkhunter" "lm-sensors" "nmap" "upower")
+    for APP in "${APPS[@]}"; do
+        check_install "$APP"
+    done
 
-# Create the Conky configuration directory if it does not exist
-mkdir -p ~/.config/conky
+    # Create the RKHunter helper script so that Conky triggers a background scan
+    create_rkhunter_scan_script
 
-# Copy the Conky configuration file
-echo -e "${GREEN}Copying Conky configuration...${NC}"
-cat <<EOL > ~/.config/conky/conky.conf
+    # Configure RKHunter permissions
+    echo -e "${BLUE}Configuring RKHunter permissions...${NC}"
+    sudo chmod +r /var/log/rkhunter.log
+    sudo usermod -aG adm "$(whoami)"
+
+    # Configure sudoers for Conky commands (avoid password prompts)
+    echo -e "${BLUE}Configuring sudoers for Conky commands...${NC}"
+    echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat, /usr/bin/sensors, /usr/bin/journalctl, /usr/bin/curl, /usr/bin/hostname -I" \
+         | sudo tee /etc/sudoers.d/conky > /dev/null
+    sudo chmod 0440 /etc/sudoers.d/conky
+
+    # Create Conky configuration directory
+    mkdir -p ~/.config/conky
+
+    # Expand USER variable for configuration
+    USERNAME="$USER"
+    echo -e "${BLUE}Creating Conky configuration...${NC}"
+    cat <<EOL > ~/.config/conky/conky.conf
 conky.config = {
-    alignment = 'top_right',              # Align Conky to the top right corner
-    background = false,                   # Do not run as a background process
-    double_buffer = true,                 # Use double buffering to reduce flickering
-    update_interval = 1,                  # Update every 1 second
-    own_window = true,                    # Use a dedicated window for Conky
-    own_window_type = 'desktop',          # Set the window type to 'desktop'
-    own_window_transparent = false,       # Disable the old transparency method
-    own_window_argb_visual = true,        # Enable ARGB visuals (for modern transparency)
-    own_window_argb_value = 200,           # Set semi-transparent background (0-255)
-    own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager', # Window hints
-    gap_x = 10,                           # Horizontal gap from screen edge
-    gap_y = 50,                           # Vertical gap from screen edge
-    minimum_width = 350,                  # Minimum window width
-    minimum_height = 400,                 # Minimum window height
-    draw_shades = false,                  # Do not draw text shadows
-    draw_borders = false,                 # Do not draw window borders
-    use_xft = true,                       # Use Xft fonts for better quality
-    default_color = 'white',              # Default text color
-    default_outline_color = 'black',      # Outline color for text
-    override_utf8_locale = true,          # Force UTF-8 locale
+    alignment = 'top_right',
+    background = false,
+    double_buffer = true,
+    update_interval = 1,
+    own_window = true,
+    own_window_type = 'desktop',
+    -- own_window_transparent = true,  # Removed for compatibility
+    own_window_argb_visual = true,
+    own_window_argb_value = 140,
+    own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager',
+    gap_x = 15,
+    gap_y = 50,
+    minimum_width = 420,
+    minimum_height = 750,
+    draw_shades = false,
+    draw_borders = false,
+    use_xft = true,
+    default_color = 'white',
+    default_outline_color = 'blue',
+    override_utf8_locale = true,
 };
 
 conky.text = [[
-${color cyan}${time %H:%M:%S}  ${color white}Vietnam Local Time (GMT+7)
-${color lightgreen}${execi 1 TZ='Europe/Madrid' date '+%H:%M:%S'}  Spain (GMT+1)
-${color yellow}${execi 1 TZ='Asia/Shanghai' date '+%H:%M:%S'}  China (GMT+8)
-${color magenta}${execi 1 TZ='America/New_York' date '+%H:%M:%S'}  New York (GMT-5)
+\${exec /home/${USERNAME}/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
+\${color yellow}\${time %H:%M:%S}       Vietnam (GMT+7)
+\${color cyan}\${execi 1 TZ='Europe/Madrid' date '+%H:%M:%S'}       Madrid (GMT+1)
+\${color green}\${execi 1 TZ='Australia/Sydney' date '+%H:%M:%S'}       Sydney (GMT+10)
+\${color magenta}\${execi 1 TZ='America/New_York' date '+%H:%M:%S'}      New York (GMT-5)
 
-${color lightblue}CPU: ${if_match ${cpu cpu0} > 80}${color red}${cpu cpu0}%${else}${color green}${cpu cpu0}%${endif} ${cpubar cpu0 10,}
-${color yellow}RAM: ${color lightblue}${memperc}% ${membar 10}
-${color orange}UPTIME: ${color white}${uptime}
+\${color magenta}------ Hardware Indicators ------
+\${color white}CPU: \${if_match \${cpu cpu0} > 80}\${color red}\${cpu cpu0}%\${else}\${color green}\${cpu cpu0}%\${endif} \${cpubar cpu0 10,}
+\${color white}RAM: \${if_match \${memperc} > 40}\${color red}\${memperc}%\${else}\${color green}\${memperc}%\${endif} \${membar 10}
+\${color white}Main HDD: \${if_match \${fs_used_perc /} > 60}\${color red}\${fs_used_perc /}%\${else}\${color green}\${fs_used_perc /}%\${endif} \${fs_bar /}
+\${color white}CPU Temp: \${color red}\${execi 10 sensors | grep -m1 -oP '(?<=\+)[0-9.]+°C' || echo "N/A"}
+\${color white}Uptime: \${color yellow}\${uptime}
 
-${color red}-- Network Information --
-${color white}Local IP Address: ${color cyan}${execi 1 hostname -I | cut -d' ' -f1}
-${color white}Public IP Address: ${color cyan}${execi 600 curl -s ifconfig.me}
-${color lightgreen}Network: Down: ${downspeedf wlp0s20f3} Up: ${upspeedf wlp0s20f3}
+\${color magenta}------ Network Info ------
+\${color white}Local IP: \${color cyan}\${execi 10 hostname -I | cut -d' ' -f1} \${color #CCCCCC} *IP L.:hostname -I | cut -d' ' -f1
+\${color white}Public IP: \${color cyan}\${execi 600 curl -s ifconfig.me} \${color #CCCCCC} *Curl -s ifconfig.me
+\${color white}VPN: \${color yellow}\${execi 30 bash -c "if [ \$(nmcli -t -f type connection show --active | grep -ic vpn) -eq 0 ]; then echo 'inactive'; else echo 'active'; fi"} \${color #CCCCCC} *nmcli -t -f type connection show --active
+\${color white}SSH Status: \${color yellow}\${execi 30 systemctl is-active ssh} \${color #CCCCCC} *systemctl is-active ssh
+\${color white}Established Connections: \${color red}\${execi 30 netstat -an | grep ESTABLECIDO | wc -l} \${color #CCCCCC} *netstat -an | grep ESTABLISHED
+\${color white}Open Ports: \${color red}\${execi 30 netstat -tuln | grep ESCUCHA | wc -l}   \${color #CCCCCC} *netstat -tuln | grep LISEN | wc -l
 
-${color red}-- Active Connections & Ports --
-${color white}Active Connections: ${color yellow}${execi 1 sudo netstat -an | grep ESTABLISHED | wc -l}
-${color white}Listening Ports: ${color yellow}${execi 1 sudo netstat -tuln | grep LISTEN | wc -l}
-${color white}Open Ports: ${color cyan}${execi 1 sudo lsof -i -P -n | grep LISTEN | wc -l} Total
-${color white}SSH Status: ${color red}${execi 1 systemctl is-active ssh}
-${color white}VPN Status: ${color green}${execi 1 nmcli connection show --active | grep vpn | wc -l} VPN(s) active
+\${color magenta}------ Logged Users ------
+\${color white}Users: \${color cyan}\${execi 30 who | awk '{print \$1}' | sort | uniq | xargs}
+\${color #CCCCCC} *who | awk '{print \$1}' | sort | uniq | xargs
 
-${color orange}-- Disk and System Information --
-${color white}Disk Usage: ${color lightblue}${execi 1 df -h / | awk 'NR==2{print \$5}'} Used
+\${color magenta}------ Security Events ------
+\${color white}Recent Events: \${color red}\${execi 30 journalctl -n 5 -p 3 -u ssh.service --no-pager | tail -n 5}
+\${color #CCCCCC} *journalctl -n 5 -p 3 -u ssh.service ...
 
-${color cyan}-- Top Processes (Highest CPU Usage) --
-${color white}${execi 1 ps -eo pid,comm,%cpu --sort=-%cpu | head -n 6 | tail -n 5}
+\${color magenta}------ Rootkit Alerts ------
+\${color white}Alerts: \${execi 600 bash -c 'if [ -f /tmp/rkhunter_warnings_prev.txt ]; then if cmp -s /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; then echo "0"; else grep -i "warning" /tmp/rkhunter_warnings.txt | wc -l; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; fi; else if [ -s /tmp/rkhunter_warnings.txt ]; then grep -i "warning" /tmp/rkhunter_warnings.txt | wc -l; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; else echo "0"; fi; fi'} \${color yellow}*Log: \${color #CCCCCC}/tmp/rkhunter_warnings.txt
 
-${color lightblue}Users Logged In:
-${color white}${execi 1 who | awk '{print \$1}'}
-
-${color red}-- Rootkit Detection (Full Scan) --
-Full Rkhunter Scan: ${color yellow}${execi 600 grep -v "System clean" /tmp/rkhunter_result.txt | tail -n 5}
-${execi 900 bash -c 'grep -i "warning" /var/log/rkhunter.log > /tmp/rkhunter_warnings.txt'}
-${color white}-- Warnings Log --
-${color lightgreen}xdg-open /tmp/rkhunter_warnings.txt
+\${color magenta}------ Top 5 Processes ------
+\${color white}\${execi 5 ps -eo pid,comm,%cpu --sort=-%cpu | head -n 6 | tail -n 5}
 ]];
 EOL
 
-# Explanation:
-# This block creates the Conky configuration file at ~/.config/conky/conky.conf.
-# It sets various options for Conky (e.g., window type, colors, update intervals, etc.),
-# and defines the text output to display system information such as time, CPU usage, network data, etc.
-# It also filters warnings from the rkhunter log into /tmp/rkhunter_warnings.txt and shows a command to open it.
-
-# Create a systemd service file to start Conky on boot automatically
-echo -e "${GREEN}Creating systemd service to start Conky automatically...${NC}"
-cat <<EOL | sudo tee /etc/systemd/system/conky.service > /dev/null
+    # Create a user-level systemd service for Conky
+    mkdir -p ~/.config/systemd/user
+    echo -e "${BLUE}Creating user-level systemd service for Conky...${NC}"
+    cat <<EOL > ~/.config/systemd/user/conky.service
 [Unit]
-Description=Conky system monitor
-After=network.target
+Description=Conky (User-Level)
+After=default.target
 
 [Service]
-ExecStart=/usr/bin/conky -c /home/$USER/.config/conky/conky.conf
-Restart=always
-User=$USER
-Group=$USER
-Environment=DISPLAY=:0
-Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
+Type=simple
+ExecStart=/usr/bin/conky -b -c "/home/$USER/.config/conky/conky.conf"
+Restart=on-failure
 
 [Install]
 WantedBy=default.target
 EOL
 
-# Explanation:
-# The above systemd service file ensures that Conky starts automatically after the network is available.
-# It uses the Conky configuration file we created and restarts Conky if it crashes.
-# The service runs under the current user with the necessary environment variables for graphical display.
+    # Reload user systemd and enable Conky service
+    systemctl --user daemon-reload
+    systemctl --user enable conky.service
+    systemctl --user start conky.service
 
-# Reload systemd configuration, enable and start the Conky service
-sudo systemctl daemon-reload
-sudo systemctl enable conky.service
-sudo systemctl start conky.service
+    echo -e "${GREEN}Conky installation complete.${NC}"
+    echo -e "${GREEN}Conky is running under your user systemd session.${NC}"
+}
 
-# Final message indicating successful installation
-echo -e "${GREEN}Installation complete. Conky is now running and will start automatically on reboot.${NC}"
+# ------------------------------------------------------------------------------
+# Function: uninstall_conky
+#   Stops and removes conky-all (and Conky processes) along with its configuration.
+# ------------------------------------------------------------------------------
+function uninstall_conky() {
+    if confirm "Are you sure you want to completely remove Conky and all its processes?"; then
+        echo -e "${RED}Stopping Conky service and all Conky processes...${NC}"
+        if [ -f ~/.config/systemd/user/conky.service ]; then
+            systemctl --user stop conky.service
+            systemctl --user disable conky.service
+            rm -f ~/.config/systemd/user/conky.service
+            systemctl --user daemon-reload
+        fi
+        # Kill any remaining Conky processes
+        pkill -f conky
+        sleep 1
+        echo -e "${RED}Removing Conky configuration...${NC}"
+        rm -rf ~/.config/conky
+        echo -e "${GREEN}Purging conky and conky-all packages...${NC}"
+        sudo apt remove --purge -y conky conky-all
+        echo -e "${GREEN}Conky uninstallation complete.${NC}"
+    else
+        echo -e "${GREEN}Uninstallation aborted.${NC}"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Function: start_conky
+#   Starts the user Conky service.
+# ------------------------------------------------------------------------------
+function start_conky() {
+    echo -e "${GREEN}Starting Conky (user) service...${NC}"
+    if [ -f ~/.config/systemd/user/conky.service ]; then
+        systemctl --user start conky.service
+        systemctl --user status conky.service --no-pager
+    else
+        echo -e "${RED}User-level conky.service not found. Please install Conky first.${NC}"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Function: stop_conky
+#   Stops the user Conky service.
+# ------------------------------------------------------------------------------
+function stop_conky() {
+    echo -e "${GREEN}Stopping Conky (user) service...${NC}"
+    if [ -f ~/.config/systemd/user/conky.service ]; then
+        systemctl --user stop conky.service
+        systemctl --user status conky.service --no-pager
+    else
+        echo -e "${RED}User-level conky.service not found. Please install Conky first.${NC}"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Function: restart_conky
+#   Restarts the user Conky service.
+# ------------------------------------------------------------------------------
+function restart_conky() {
+    echo -e "${GREEN}Restarting Conky (user) service...${NC}"
+    if [ -f ~/.config/systemd/user/conky.service ]; then
+        systemctl --user restart conky.service
+        systemctl --user status conky.service --no-pager
+    else
+        echo -e "${RED}User-level conky.service not found. Please install Conky first.${NC}"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Function: check_rkhunter
+#   Runs an automated RKHunter scan and writes only warnings to a log.
+# ------------------------------------------------------------------------------
+function check_rkhunter() {
+    echo -e "${BLUE}Running RKHunter scan...${NC}"
+    local WARN_LOG="/tmp/rkhunter_warnings.txt"
+    sudo rkhunter --update > /dev/null 2>&1
+    sudo rkhunter --propupd > /dev/null 2>&1
+    sudo rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null
+    grep -i "warning" /tmp/rkhunter_result.txt > "$WARN_LOG"
+    if [ -s "$WARN_LOG" ]; then
+         local count
+         count=$(wc -l < "$WARN_LOG")
+         echo -e "${RED}You have ${count} alert(s).${NC}"
+         echo -e "${YELLOW}View warnings: cat $WARN_LOG${NC}"
+    else
+         echo -e "${GREEN}No alerts detected.${NC}"
+         rm -f "$WARN_LOG"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Function: restore_system
+#   Reinstalls essential system packages that might have been removed,
+#   including the desktop environment, Nautilus, and Google Chrome.
+#   In each step, a note is shown and confirmation is required.
+# ------------------------------------------------------------------------------
+function restore_system() {
+    echo -e "${BLUE}Restoring essential system packages...${NC}"
+    sudo apt update
+
+    # Define an array of essential packages with notes.
+    local ESSENTIAL_PACKAGES=("ubuntu-desktop" "gdm3" "nautilus" "gvfs" "gvfs-backends" "gvfs-daemons" "gvfs-common" "ubuntu-standard" "ubuntu-minimal" "dbus-x11" "network-manager")
+    local note
+
+    for pkg in "${ESSENTIAL_PACKAGES[@]}"; do
+         case "$pkg" in
+              "ubuntu-desktop")
+                   note="(Installs the default Ubuntu desktop environment)";;
+              "gdm3")
+                   note="(Installs the GNOME Display Manager - login screen)";;
+              "nautilus")
+                   note="(Installs the file manager for GNOME)";;
+              "gvfs")
+                   note="(Installs the GNOME Virtual File System)";;
+              "gvfs-backends")
+                   note="(Provides backends for GVFS)";;
+              "gvfs-daemons")
+                   note="(Installs daemons for GVFS)";;
+              "gvfs-common")
+                   note="(Common files for GVFS)";;
+              "ubuntu-standard")
+                   note="(Standard packages for Ubuntu)";;
+              "ubuntu-minimal")
+                   note="(Minimal packages required for Ubuntu)";;
+              "dbus-x11")
+                   note="(Provides X11 support for DBus)";;
+              "network-manager")
+                   note="(Manages network connections)";;
+              *)
+                   note="(No additional info)";;
+         esac
+
+         if confirm "Do you want to reinstall $pkg $note?"; then
+              sudo apt install -y "$pkg"
+         else
+              echo -e "${YELLOW}Skipping reinstallation of $pkg.${NC}"
+         fi
+    done
+
+    # Ask to run fix-broken install
+    if confirm "Do you want to run 'sudo apt --fix-broken install -y'? (This will fix any broken dependencies)"; then
+         sudo apt --fix-broken install -y
+    else
+         echo -e "${YELLOW}Skipping fix-broken installation.${NC}"
+    fi
+
+    # Google Chrome: check if installed; if not, ask to install; if installed, ask if want to reinstall.
+    if ! dpkg -l | grep -qw google-chrome-stable; then
+         if confirm "Google Chrome is not installed. Do you want to install Google Chrome? (It will be downloaded from the official website)"; then
+             wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome-stable_current_amd64.deb
+             sudo dpkg -i /tmp/google-chrome-stable_current_amd64.deb || sudo apt -f install -y
+         else
+             echo -e "${YELLOW}Skipping installation of Google Chrome.${NC}"
+         fi
+    else
+         if confirm "Google Chrome is already installed. Do you want to reinstall it?"; then
+             sudo apt install --reinstall -y google-chrome-stable
+         else
+             echo -e "${YELLOW}Keeping the current installation of Google Chrome.${NC}"
+         fi
+    fi
+
+    echo -e "${GREEN}Essential system packages restoration complete.${NC}"
+}
+
+# ------------------------------------------------------------------------------
+# Function: install_rkhunter_service
+#   Installs a system-wide systemd service to automatically run the RKHunter scan at boot.
+# ------------------------------------------------------------------------------
+function install_rkhunter_service() {
+    echo -e "${BLUE}Installing automatic RKHunter scan service...${NC}"
+    sudo tee /etc/systemd/system/rkhunter-auto.service > /dev/null <<EOL
+[Unit]
+Description=Automatic RKHunter Scan at Boot
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'rkhunter --update > /dev/null 2>&1 && rkhunter --propupd > /dev/null 2>&1 && rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null && grep -i "warning" /tmp/rkhunter_result.txt > /tmp/rkhunter_warnings.txt'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOL
+    sudo systemctl daemon-reload
+    sudo systemctl enable rkhunter-auto.service
+    echo -e "${GREEN}Automatic RKHunter scan service installed.${NC}"
+    echo -e "${YELLOW}Warnings log: /tmp/rkhunter_warnings.txt${NC}"
+}
+
+# ------------------------------------------------------------------------------
+# Function: remove_rkhunter_service
+#   Removes the automatic RKHunter scan service.
+# ------------------------------------------------------------------------------
+function remove_rkhunter_service() {
+    echo -e "${RED}Removing automatic RKHunter scan service...${NC}"
+    sudo systemctl disable rkhunter-auto.service
+    sudo rm -f /etc/systemd/system/rkhunter-auto.service
+    sudo systemctl daemon-reload
+    echo -e "${GREEN}Automatic RKHunter scan service removed.${NC}"
+}
+
+# ------------------------------------------------------------------------------
+# Function: main_menu
+#   Displays a numeric menu and calls the corresponding functions.
+# ------------------------------------------------------------------------------
+function main_menu() {
+    while true; do
+        echo -e "\n${CYAN}~~~~~ Conky Cybersecurity Monitor Menu ~~~~~${NC}"
+        echo "1) Install Conky"
+        echo "2) Uninstall Conky"
+        echo "3) Start Conky"
+        echo "4) Stop Conky"
+        echo "5) Restart Conky"
+        echo "6) Check RKHunter (Manual)"
+        echo "7) Restore Essential System Packages"
+        echo "8) Install Automatic RKHunter Scan Service"
+        echo "9) Remove Automatic RKHunter Scan Service"
+        echo "10) Exit"
+        echo -ne "${BLUE}Choose an option [1-10]: ${NC}"
+        read -r choice
+        case "$choice" in
+            1) install_conky ;;
+            2) uninstall_conky ;;
+            3) start_conky ;;
+            4) stop_conky ;;
+            5) restart_conky ;;
+            6) check_rkhunter ;;
+            7) restore_system ;;
+            8) install_rkhunter_service ;;
+            9) remove_rkhunter_service ;;
+            10)
+                echo -e "${GREEN}Exiting. Goodbye!${NC}"
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}Invalid option. Please choose again.${NC}"
+                ;;
+        esac
+    done
+}
+
+# ------------------------------------------------------------------------------
+# Start the menu
+# ------------------------------------------------------------------------------
+main_menu
