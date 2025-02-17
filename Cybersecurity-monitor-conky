@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Conky Installation & Management Script (User Systemd Service + Menu)
-# with Automatic RKHunter Scan, Enhanced Indicators (including Disk Usage,
-# VPN/SSH detection), and Elegant Design
+# with Automatic RKHunter Scan, Temperature Monitor, Uptime Indicator,
+# and Elegant Design
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # -- COLORS --------------------------------------------------------------------
@@ -86,9 +86,70 @@ EOF
 }
 
 # ------------------------------------------------------------------------------
+# Function: configure_sensors
+#   Runs sensors-detect to automatically configure lm-sensors.
+# ------------------------------------------------------------------------------
+function configure_sensors() {
+    echo -e "${BLUE}Configuring hardware sensors (lm-sensors)...${NC}"
+    if command -v sensors &> /dev/null; then
+         if confirm "Do you want to run sensors-detect to configure your sensors automatically?"; then
+             echo -e "${BLUE}Running sensors-detect...${NC}"
+             yes | sudo sensors-detect > /dev/null 2>&1
+             echo -e "${GREEN}Sensors configuration complete.${NC}"
+         else
+             echo -e "${YELLOW}Skipping sensors-detect configuration.${NC}"
+         fi
+    else
+         echo -e "${RED}lm-sensors is not installed. Skipping sensors configuration.${NC}"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Function: create_temp_monitor_script
+#   Creates a helper script that runs in background to monitor CPU temperature.
+# ------------------------------------------------------------------------------
+function create_temp_monitor_script() {
+    local SCRIPT="$INSTALL_DIR/temp_monitor.sh"
+    cat <<'EOF' > "$SCRIPT"
+#!/usr/bin/env bash
+while true; do
+    temp=$(sensors | grep -Eo '\+[0-9]+(\.[0-9]+)?°C' | head -n1)
+    echo "${temp:-N/A}" > /tmp/cpu_temp.txt
+    sleep 10
+done
+EOF
+    chmod +x "$SCRIPT"
+}
+
+# ------------------------------------------------------------------------------
+# Function: install_temp_monitor_service
+#   Installs a user-level systemd service for the temperature monitor.
+# ------------------------------------------------------------------------------
+function install_temp_monitor_service() {
+    mkdir -p ~/.config/systemd/user
+    cat <<EOL > ~/.config/systemd/user/temp_monitor.service
+[Unit]
+Description=Temperature Monitor for Conky
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env bash "$INSTALL_DIR/temp_monitor.sh"
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOL
+    systemctl --user daemon-reload
+    systemctl --user enable temp_monitor.service
+    systemctl --user start temp_monitor.service
+    echo -e "${GREEN}Temperature monitor service installed and started.${NC}"
+}
+
+# ------------------------------------------------------------------------------
 # Function: install_conky
 #   Installs conky-all and its dependencies, configures RKHunter,
-#   creates a user-level systemd service for Conky, and starts it.
+#   creates a user-level systemd service for Conky, the temperature monitor service,
+#   and starts it.
 # ------------------------------------------------------------------------------
 function install_conky() {
     if ! confirm "Proceed with Conky installation and setup?"; then
@@ -99,30 +160,29 @@ function install_conky() {
     echo -e "${BLUE}Updating package lists...${NC}"
     sudo apt update
 
-    # Required packages for Conky functionality
+    # Required packages for Conky functionality (including lm-sensors)
     local APPS=("conky-all" "curl" "net-tools" "lsof" "xdg-utils" "rkhunter" "lm-sensors" "nmap" "upower")
     for APP in "${APPS[@]}"; do
         check_install "$APP"
     done
 
+    # Configure lm-sensors (run sensors-detect)
+    configure_sensors
+
     # Create the RKHunter helper script so that Conky triggers a background scan
     create_rkhunter_scan_script
 
-    # Configure RKHunter permissions
     echo -e "${BLUE}Configuring RKHunter permissions...${NC}"
     sudo chmod +r /var/log/rkhunter.log
     sudo usermod -aG adm "$(whoami)"
 
-    # Configure sudoers for Conky commands (avoid password prompts)
     echo -e "${BLUE}Configuring sudoers for Conky commands...${NC}"
-    echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat, /usr/bin/sensors, /usr/bin/journalctl, /usr/bin/curl, /usr/bin/hostname -I" \
+    echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat, /usr/bin/sensors, /usr/bin/journalctl, /usr/bin/curl, /usr/bin/hostname -I, /usr/bin/rkhunter" \
          | sudo tee /etc/sudoers.d/conky > /dev/null
     sudo chmod 0440 /etc/sudoers.d/conky
 
-    # Create Conky configuration directory
     mkdir -p ~/.config/conky
 
-    # Expand USER variable for configuration
     USERNAME="$USER"
     echo -e "${BLUE}Creating Conky configuration...${NC}"
     cat <<EOL > ~/.config/conky/conky.conf
@@ -133,7 +193,6 @@ conky.config = {
     update_interval = 1,
     own_window = true,
     own_window_type = 'desktop',
-    -- own_window_transparent = true,  # Removed for compatibility
     own_window_argb_visual = true,
     own_window_argb_value = 140,
     own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager',
@@ -152,35 +211,33 @@ conky.config = {
 conky.text = [[
 \${exec /home/${USERNAME}/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
 \${color yellow}\${time %H:%M:%S}       Vietnam (GMT+7)
-\${color cyan}\${execi 1 TZ='Europe/Madrid' date '+%H:%M:%S'}       Madrid (GMT+1)
-\${color green}\${execi 1 TZ='Australia/Sydney' date '+%H:%M:%S'}       Sydney (GMT+10)
-\${color magenta}\${execi 1 TZ='America/New_York' date '+%H:%M:%S'}      New York (GMT-5)
+\${color cyan}\${execi 10 TZ='Europe/Madrid' date '+%H:%M:%S'}       Madrid (GMT+1)
+\${color green}\${execi 10 TZ='Australia/Sydney' date '+%H:%M:%S'}       Sydney (GMT+10)
+\${color magenta}\${execi 10 TZ='America/New_York' date '+%H:%M:%S'}      New York (GMT-5)
 
 \${color magenta}------ Hardware Indicators ------
 \${color white}CPU: \${if_match \${cpu cpu0} > 80}\${color red}\${cpu cpu0}%\${else}\${color green}\${cpu cpu0}%\${endif} \${cpubar cpu0 10,}
 \${color white}RAM: \${if_match \${memperc} > 40}\${color red}\${memperc}%\${else}\${color green}\${memperc}%\${endif} \${membar 10}
 \${color white}Main HDD: \${if_match \${fs_used_perc /} > 60}\${color red}\${fs_used_perc /}%\${else}\${color green}\${fs_used_perc /}%\${endif} \${fs_bar /}
-\${color white}CPU Temp: \${color red}\${execi 10 sensors | grep -m1 -oP '(?<=\+)[0-9.]+°C' || echo "N/A"}
-\${color white}Uptime: \${color yellow}\${uptime}
+\${color white}CPU Temp: \${color red}\${execi 10 cat /tmp/cpu_temp.txt || echo "N/A"}
+\${color white}Uptime: \${color green}\${uptime}
 
 \${color magenta}------ Network Info ------
-\${color white}Local IP: \${color cyan}\${execi 10 hostname -I | cut -d' ' -f1} \${color #CCCCCC} *IP L.: hostname -I | cut -d' ' -f1
-\${color white}Public IP: \${color cyan}\${execi 600 curl -s ifconfig.me} \${color #CCCCCC} *Curl -s ifconfig.me
-\${color white}VPN: \${color yellow}\${execi 30 bash -c "if [ \$(nmcli -t -f type connection show --active | grep -ic vpn) -eq 0 ]; then echo 'inactive'; else echo 'active'; fi"} \${color #CCCCCC} *nmcli -t -f type connection show --active
-\${color white}SSH Status: \${color yellow}\${execi 30 systemctl is-active ssh} \${color #CCCCCC} *systemctl is-active ssh
-\${color white}Established Connections: \${color red}\${execi 10 netstat -an | grep ESTABLECIDO | wc -l} \${color #CCCCCC} *netstat -an | grep ESTABLISHED
-\${color white}Open Ports: \${color red}\${execi 10 netstat -tuln | grep ESCUCHA | wc -l}   \${color #CCCCCC} *netstat -tuln | grep LISEN | wc -l
+\${color white}Local IP: \${color cyan}\${execi 10 hostname -I | cut -d' ' -f1}
+\${color white}Public IP: \${color cyan}\${execi 600 curl -s ifconfig.me}
+\${color white}VPN: \${color yellow}\${execi 30 bash -c "if [ \$(nmcli -t -f type connection show --active | grep -ic vpn) -eq 0 ]; then echo 'inactive'; else echo 'active'; fi"}
+\${color white}SSH Status: \${color yellow}\${execi 30 systemctl is-active ssh}
+\${color white}Established Connections: \${color red}\${execi 10 netstat -an | grep ESTABLECIDO | wc -l}
+\${color white}Open Ports: \${color red}\${execi 10 netstat -tuln | grep ESCUCHA | wc -l}
 
 \${color magenta}------ Logged Users ------
 \${color white}Users: \${color cyan}\${execi 30 who | awk '{print \$1}' | sort | uniq | xargs}
-\${color #CCCCCC} *who | awk '{print \$1}' | sort | uniq | xargs
 
 \${color magenta}------ Security Events ------
 \${color white}Recent Events: \${color red}\${execi 30 journalctl -n 5 -p 3 -u ssh.service --no-pager | tail -n 5}
-\${color #CCCCCC} *journalctl -n 5 -p 3 -u ssh.service ...
 
 \${color magenta}------ Rootkit Alerts ------
-\${color white}Alerts: \${execi 600 bash -c 'if [ -f /tmp/rkhunter_warnings_prev.txt ]; then if cmp -s /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; then echo "0"; else grep -i "warning" /tmp/rkhunter_warnings.txt | wc -l; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; fi; else if [ -s /tmp/rkhunter_warnings.txt ]; then grep -i "warning" /tmp/rkhunter_warnings.txt | wc -l; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; else echo "0"; fi; fi'} \${color yellow}*Log: \${color #CCCCCC}/tmp/rkhunter_warnings.txt
+\${color white}Alerts: \${execi 600 bash -c 'if [ -f /tmp/rkhunter_warnings_prev.txt ]; then if cmp -s /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; then echo "0"; else echo "1"; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; fi; else if [ -s /tmp/rkhunter_warnings.txt ]; then echo "1"; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; else echo "0"; fi; fi'} \${color yellow}*Log: \${color #CCCCCC}/tmp/rkhunter_warnings.txt
 
 \${color magenta}------ Top 5 Processes ------
 \${color white}\${execi 5 ps -eo pid,comm,%cpu --sort=-%cpu | head -n 6 | tail -n 5}
@@ -211,6 +268,13 @@ EOL
 
     echo -e "${GREEN}Conky installation complete.${NC}"
     echo -e "${GREEN}Conky is running under your user systemd session.${NC}"
+
+    # Install temperature monitor script and service
+    create_temp_monitor_script
+    install_temp_monitor_service
+
+    # Install RKHunter service and timer automatically
+    install_rkhunter_service
 }
 
 # ------------------------------------------------------------------------------
@@ -224,6 +288,13 @@ function uninstall_conky() {
             systemctl --user stop conky.service
             systemctl --user disable conky.service
             rm -f ~/.config/systemd/user/conky.service
+            systemctl --user daemon-reload
+        fi
+        # Stop temperature monitor service
+        if [ -f ~/.config/systemd/user/temp_monitor.service ]; then
+            systemctl --user stop temp_monitor.service
+            systemctl --user disable temp_monitor.service
+            rm -f ~/.config/systemd/user/temp_monitor.service
             systemctl --user daemon-reload
         fi
         # Kill any remaining Conky processes
