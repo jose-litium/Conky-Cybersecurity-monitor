@@ -10,7 +10,524 @@ BLUE='\033[1;34m'
 CYAN='\033[1;36m'
 GREEN='\033[1;32m'
 MAGENTA='\033[1;35m'
-YELLOW='\033[1;33m'
+YELLOW='\033[1;33m'#!/usr/bin/env bash
+# Conky Cybersecurity Monitor – Full App
+#
+# This script installs, configures, and manages Conky along with additional
+# security tools (such as RKHunter) using a Zenity GUI interface.
+# It also creates a desktop launcher so that the app can be launched without
+# using the terminal.
+#
+# Author: Your Name
+# Date: 2025-02-17
+
+########################################
+# Global Configuration
+########################################
+
+LOGFILE="/tmp/conky_gui.log"
+INSTALL_DIR="$HOME/.local/conky_app"
+mkdir -p "$INSTALL_DIR"
+
+########################################
+# Utility Functions
+########################################
+
+# Write a message to the log file with a timestamp.
+log() {
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOGFILE"
+}
+
+# Clear the log file.
+clear_log() {
+  > "$LOGFILE"
+}
+
+# Run a command and log its output.
+run_cmd() {
+  log "Executing: $*"
+  "$@" >> "$LOGFILE" 2>&1
+}
+
+########################################
+# Internal Functions
+########################################
+
+# Check if user-level systemd is available.
+check_user_systemd() {
+  if ! systemctl --user &>/dev/null; then
+    log "User-level systemd is not available. Exiting."
+    zenity --error --width=400 --text="User-level systemd is not available.
+Please use an Ubuntu version with desktop support (18.04+)."
+    exit 1
+  fi
+}
+
+# Check if a package is installed; if not, install it.
+check_install() {
+  local pkg="$1"
+  if dpkg -l | grep -qw "$pkg"; then
+    log "$pkg is already installed."
+  else
+    log "$pkg is not installed, installing..."
+    run_cmd sudo apt install -y "$pkg"
+  fi
+}
+
+# Configure sensors by running sensors-detect in automatic mode.
+configure_sensors() {
+  if command -v sensors &>/dev/null; then
+    log "Running sensors-detect in automatic mode (answering 'yes' to all prompts)..."
+    run_cmd sudo yes | sensors-detect --auto
+    log "Sensors configuration complete."
+  else
+    log "lm-sensors not installed. Skipping sensors-detect."
+  fi
+}
+
+# Create a helper script to run the RKHunter scan.
+create_rkhunter_scan_script() {
+  local SCRIPT="$INSTALL_DIR/rkhunter_scan.sh"
+  cat <<'EOF' > "$SCRIPT"
+#!/usr/bin/env bash
+sudo rkhunter --update > /dev/null 2>&1 && \
+sudo rkhunter --propupd > /dev/null 2>&1 && \
+sudo rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null && \
+grep -i "warning" /tmp/rkhunter_result.txt > /tmp/rkhunter_warnings.txt
+EOF
+  chmod +x "$SCRIPT"
+  log "RKHunter scan script created at $SCRIPT."
+}
+
+# Create a helper script to monitor CPU temperature.
+create_temp_monitor_script() {
+  local SCRIPT="$INSTALL_DIR/temp_monitor.sh"
+  cat <<'EOF' > "$SCRIPT"
+#!/usr/bin/env bash
+while true; do
+  temp=$(sensors | grep -Eo '\+[0-9]+(\.[0-9]+)?°C' | head -n1)
+  echo "${temp:-N/A}" > /tmp/cpu_temp.txt
+  sleep 10
+done
+EOF
+  chmod +x "$SCRIPT"
+  log "Temperature monitor script created at $SCRIPT."
+}
+
+# Install and start the user-level systemd service for CPU temperature monitoring.
+install_temp_monitor_service() {
+  mkdir -p ~/.config/systemd/user
+  cat <<EOL > ~/.config/systemd/user/temp_monitor.service
+[Unit]
+Description=CPU Temperature Monitor for Conky
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env bash "$INSTALL_DIR/temp_monitor.sh"
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOL
+  run_cmd systemctl --user daemon-reload
+  run_cmd systemctl --user enable temp_monitor.service
+  run_cmd systemctl --user start temp_monitor.service
+  log "CPU temperature monitor service installed and started."
+}
+
+# Install the system-wide RKHunter service and timer.
+install_rkhunter_service() {
+  sudo tee /etc/systemd/system/rkhunter-auto.service > /dev/null <<EOL
+[Unit]
+Description=Automatic RKHunter Scan
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'rkhunter --update > /dev/null 2>&1 && rkhunter --propupd > /dev/null 2>&1 && rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null && grep -i "warning" /tmp/rkhunter_result.txt > /tmp/rkhunter_warnings.txt'
+RemainAfterExit=yes
+EOL
+
+  sudo tee /etc/systemd/system/rkhunter-auto.timer > /dev/null <<EOL
+[Unit]
+Description=Timer for Automatic RKHunter Scan
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target
+EOL
+
+  run_cmd sudo systemctl daemon-reload
+  run_cmd sudo systemctl enable rkhunter-auto.timer
+  run_cmd sudo systemctl start rkhunter-auto.timer
+  log "RKHunter service and timer installed."
+}
+
+# Remove the system-wide RKHunter service and timer.
+remove_rkhunter_service() {
+  run_cmd sudo systemctl disable rkhunter-auto.timer
+  run_cmd sudo systemctl stop rkhunter-auto.timer
+  run_cmd sudo rm -f /etc/systemd/system/rkhunter-auto.timer
+  run_cmd sudo systemctl disable rkhunter-auto.service
+  run_cmd sudo rm -f /etc/systemd/system/rkhunter-auto.service
+  run_cmd sudo systemctl daemon-reload
+  log "RKHunter service and timer removed."
+}
+
+########################################
+# Main Action Functions
+########################################
+
+install_conky() {
+  if ! zenity --question --width=400 --text="Proceed with the installation and configuration of Conky?"; then
+    log "Installation aborted by the user."
+    return
+  fi
+  clear_log
+  log "Starting Conky installation..."
+  check_user_systemd
+  log "Updating package lists..."
+  run_cmd sudo apt update
+
+  # Install required packages.
+  local APPS=("conky-all" "curl" "net-tools" "lsof" "xdg-utils" "rkhunter" "lm-sensors" "nmap" "upower")
+  for pkg in "${APPS[@]}"; do
+    check_install "$pkg"
+  done
+
+  configure_sensors
+  create_rkhunter_scan_script
+
+  log "Setting permissions for RKHunter..."
+  run_cmd sudo chmod +r /var/log/rkhunter.log
+  run_cmd sudo usermod -aG adm "$(whoami)"
+
+  log "Configuring sudoers for Conky commands..."
+  echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat, /usr/bin/sensors, /usr/bin/journalctl, /usr/bin/curl, /usr/bin/hostname -I, /usr/bin/rkhunter" \
+       | sudo tee /etc/sudoers.d/conky > /dev/null
+  run_cmd sudo chmod 0440 /etc/sudoers.d/conky
+
+  mkdir -p ~/.config/conky
+  local USERNAME="$USER"
+  cat <<EOL > ~/.config/conky/conky.conf
+conky.config = {
+    alignment = 'top_right',
+    background = false,
+    double_buffer = true,
+    update_interval = 1,
+    own_window = true,
+    own_window_type = 'desktop',
+    own_window_argb_visual = true,
+    own_window_argb_value = 140,
+    own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager',
+    gap_x = 15,
+    gap_y = 50,
+    minimum_width = 420,
+    minimum_height = 750,
+    draw_shades = false,
+    draw_borders = false,
+    use_xft = true,
+    default_color = 'white',
+    default_outline_color = 'blue',
+    override_utf8_locale = true,
+};
+
+conky.text = [[
+\${exec /home/${USERNAME}/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
+\${color yellow}\${time %H:%M:%S}       Vietnam (GMT+7)
+\${color cyan}\${execi 1 TZ='Europe/Madrid' date '+%H:%M:%S'}       Madrid (GMT+1)
+\${color green}\${execi 1 TZ='Australia/Sydney' date '+%H:%M:%S'}       Sydney (GMT+10)
+\${color magenta}\${execi 1 TZ='America/New_York' date '+%H:%M:%S'}      New York (GMT-5)
+
+\${color magenta}------ Hardware Indicators ------
+\${color white}CPU: \${if_match \${cpu cpu0} > 80}\${color red}\${cpu cpu0}%\${else}\${color green}\${cpu cpu0}%\${endif} \${cpubar cpu0 10,}
+\${color white}RAM: \${if_match \${memperc} > 40}\${color red}\${memperc}%\${else}\${color green}\${memperc}%\${endif} \${membar 10}
+\${color white}Main HDD: \${if_match \${fs_used_perc /} > 60}\${color red}\${fs_used_perc /}%\${else}\${color green}\${fs_used_perc /}%\${endif} \${fs_bar /}
+\${color white}CPU Temp: \${color red}\${execi 10 cat /tmp/cpu_temp.txt || echo "N/A"}
+\${color white}Uptime: \${color green}\${uptime}
+
+\${color magenta}------ Network Information ------
+\${color white}Local IP: \${color cyan}\${execi 1 hostname -I | cut -d' ' -f1}
+\${color white}Public IP: \${color cyan}\${execi 1 curl -s ifconfig.me}
+\${color white}VPN: \${color yellow}\${execi 1 bash -c "if [ \$(nmcli -t -f type connection show --active | grep -ic vpn) -eq 0 ]; then echo 'inactive'; else echo 'active'; fi"}
+\${color white}SSH Status: \${color yellow}\${execi 1 systemctl is-active ssh}
+\${color white}Established Connections: \${color red}\${execi 1 netstat -an | grep ESTABLISHED | wc -l}
+\${color white}Open Ports: \${color red}\${execi 1 netstat -tuln | grep LISTEN | wc -l}
+
+\${color magenta}------ Logged In Users ------
+\${color white}Users: \${color cyan}\${execi 1 who | awk '{print \$1}' | sort | uniq | xargs}
+
+\${color magenta}------ Security Events ------
+\${color white}Recent Events: \${color red}\${execi 1 journalctl -n 5 -p 3 -u ssh.service --no-pager | tail -n 5}
+
+\${color magenta}------ Rootkit Alerts ------
+\${color white}Alerts: \${execi 1 bash -c 'if [ -f /tmp/rkhunter_warnings_prev.txt ]; then if cmp -s /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; then echo "0"; else echo "1"; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; fi; else if [ -s /tmp/rkhunter_warnings.txt ]; then echo "1"; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; else echo "0"; fi; fi'} \${color yellow}*Log: \${color #CCCCCC}/tmp/rkhunter_warnings.txt
+
+\${color magenta}------ Top 5 Processes ------
+\${color white}\${execi 1 ps -eo pid,comm,%cpu --sort=-%cpu | head -n 6 | tail -n 5}
+]];
+EOL
+
+  mkdir -p ~/.config/systemd/user
+  cat <<EOL > ~/.config/systemd/user/conky.service
+[Unit]
+Description=Conky (User-Level)
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/conky -b -c "/home/$USER/.config/conky/conky.conf"
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+EOL
+
+  run_cmd systemctl --user daemon-reload
+  run_cmd systemctl --user enable conky.service
+  run_cmd systemctl --user start conky.service
+
+  log "Conky installation complete and service started."
+  create_temp_monitor_script
+  install_temp_monitor_service
+  install_rkhunter_service
+}
+
+# Improved uninstallation function with progress and confirmations.
+uninstall_conky() {
+  if ! zenity --question --width=400 --text="Are you sure you want to completely remove Conky and all its processes?"; then
+    log "Uninstallation aborted by the user."
+    return
+  fi
+  clear_log
+  log "Starting Conky uninstallation..."
+  (
+    echo "10" ; sleep 0.5
+    if [ -f ~/.config/systemd/user/conky.service ]; then
+      if zenity --question --width=400 --text="Remove the Conky service?"; then
+        run_cmd systemctl --user stop conky.service
+        run_cmd systemctl --user disable conky.service
+        rm -f ~/.config/systemd/user/conky.service
+        run_cmd systemctl --user daemon-reload
+        log "Conky service stopped and removed."
+      else
+        log "Conky service not removed."
+      fi
+    fi
+    echo "30" ; sleep 0.5
+    if [ -f ~/.config/systemd/user/temp_monitor.service ]; then
+      if zenity --question --width=400 --text="Remove the temperature monitor service?"; then
+        run_cmd systemctl --user stop temp_monitor.service
+        run_cmd systemctl --user disable temp_monitor.service
+        rm -f ~/.config/systemd/user/temp_monitor.service
+        run_cmd systemctl --user daemon-reload
+        log "Temperature monitor service stopped and removed."
+      else
+        log "Temperature monitor service not removed."
+      fi
+    fi
+    echo "50" ; sleep 0.5
+    if zenity --question --width=400 --text="Stop active Conky processes?"; then
+      run_cmd pkill -f conky
+      log "Conky processes stopped."
+    else
+      log "Conky processes not stopped."
+    fi
+    echo "60" ; sleep 0.5
+    if zenity --question --width=400 --text="Remove Conky configuration at ~/.config/conky?"; then
+      rm -rf ~/.config/conky
+      log "Conky configuration removed."
+    else
+      log "Conky configuration not removed."
+    fi
+    echo "80" ; sleep 0.5
+    if zenity --question --width=400 --text="Remove conky and conky-all packages from the system?"; then
+      run_cmd sudo apt remove --purge -y conky conky-all
+      log "Conky packages removed."
+    else
+      log "Conky packages not removed."
+    fi
+    echo "100" ; sleep 0.5
+  ) | zenity --progress --title="Uninstalling Conky..." --text="Processing..." --percentage=0 --auto-close
+
+  zenity --info --width=400 --text="Uninstallation complete. Please review the log at $LOGFILE for details."
+}
+
+start_conky() {
+  clear_log
+  log "Starting Conky service..."
+  if [ -f ~/.config/systemd/user/conky.service ]; then
+    run_cmd systemctl --user start conky.service
+    log "Conky service started."
+  else
+    log "Conky service not found. Please install Conky first."
+  fi
+  zenity --info --width=400 --text="Start complete. See log at $LOGFILE."
+}
+
+stop_conky() {
+  clear_log
+  log "Stopping Conky service..."
+  if [ -f ~/.config/systemd/user/conky.service ]; then
+    run_cmd systemctl --user stop conky.service
+    log "Conky service stopped."
+  else
+    log "Conky service not found. Please install Conky first."
+  fi
+  zenity --info --width=400 --text="Stop complete. See log at $LOGFILE."
+}
+
+restart_conky() {
+  clear_log
+  log "Restarting Conky service..."
+  if [ -f ~/.config/systemd/user/conky.service ]; then
+    run_cmd systemctl --user restart conky.service
+    log "Conky service restarted."
+  else
+    log "Conky service not found. Please install Conky first."
+  fi
+  zenity --info --width=400 --text="Restart complete. See log at $LOGFILE."
+}
+
+check_rkhunter() {
+  clear_log
+  log "Running RKHunter scan..."
+  run_cmd sudo rkhunter --update
+  run_cmd sudo rkhunter --propupd
+  run_cmd sudo rkhunter --check --sk
+  run_cmd grep -i "warning" /tmp/rkhunter_result.txt > /tmp/rkhunter_warnings.txt
+  if [ -s /tmp/rkhunter_warnings.txt ]; then
+    local count
+    count=$(wc -l < /tmp/rkhunter_warnings.txt)
+    log "Found ${count} alert(s) in RKHunter."
+  else
+    log "No alerts detected in RKHunter."
+    run_cmd rm -f /tmp/rkhunter_warnings.txt
+  fi
+  zenity --info --width=400 --text="RKHunter scan complete. See log at $LOGFILE."
+}
+
+restore_system() {
+  if ! zenity --question --width=400 --text="Restore essential system packages?"; then
+    log "System restoration aborted by the user."
+    return
+  fi
+  clear_log
+  log "Starting system package restoration..."
+  run_cmd sudo apt update
+  local ESSENTIAL_PACKAGES=("ubuntu-desktop" "gdm3" "nautilus" "gvfs" "gvfs-backends" "gvfs-daemons" "gvfs-common" "ubuntu-standard" "ubuntu-minimal" "dbus-x11" "network-manager")
+  for pkg in "${ESSENTIAL_PACKAGES[@]}"; do
+    log "Reinstalling $pkg..."
+    run_cmd sudo apt install -y "$pkg"
+  done
+  if zenity --question --width=400 --text="Run 'sudo apt --fix-broken install -y'?"; then
+    run_cmd sudo apt --fix-broken install -y
+  fi
+  if ! dpkg -l | grep -qw google-chrome-stable; then
+    if zenity --question --width=400 --text="Google Chrome is not installed. Install it?"; then
+      run_cmd wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome-stable_current_amd64.deb
+      run_cmd sudo dpkg -i /tmp/google-chrome-stable_current_amd64.deb || run_cmd sudo apt -f install -y
+    fi
+  else
+    if zenity --question --width=400 --text="Google Chrome is installed. Reinstall it?"; then
+      run_cmd sudo apt install --reinstall -y google-chrome-stable
+    fi
+  fi
+  log "System package restoration complete."
+  zenity --info --width=400 --text="Restoration complete. See log at $LOGFILE."
+}
+
+########################################
+# Desktop Launcher Function
+########################################
+
+create_launcher() {
+  # Use the current script's full path as Exec.
+  SCRIPT_PATH="$(readlink -f "$0")"
+  DESKTOP_FILE="$HOME/.local/share/applications/conky-cybersecurity-monitor.desktop"
+  mkdir -p "$HOME/.local/share/applications"
+  cat > "$DESKTOP_FILE" <<EOF
+[Desktop Entry]
+Name=Conky Cybersecurity Monitor
+Comment=Manage Conky Cybersecurity Monitor
+Exec=$SCRIPT_PATH
+Icon=
+Terminal=false
+Type=Application
+Categories=Utility;
+EOF
+  zenity --info --width=400 --text="Desktop launcher created at $DESKTOP_FILE."
+  log "Desktop launcher created at $DESKTOP_FILE."
+}
+
+########################################
+# Main Menu (Zenity GUI)
+########################################
+
+while true; do
+  CHOICE=$(zenity --list --width=500 --height=600 --title="Conky Cybersecurity Monitor" \
+    --column="ID" --column="Option" \
+    1 "Install Conky" \
+    2 "Uninstall Conky" \
+    3 "Start Conky" \
+    4 "Stop Conky" \
+    5 "Restart Conky" \
+    6 "Run RKHunter Scan" \
+    7 "Restore Essential System Packages" \
+    8 "Install RKHunter Auto Service" \
+    9 "Remove RKHunter Auto Service" \
+    10 "Create Desktop Launcher" \
+    11 "Exit")
+  
+  case "$CHOICE" in
+    1)
+      install_conky
+      zenity --text-info --width=600 --height=400 --title="Installation Log" --filename="$LOGFILE"
+      ;;
+    2)
+      uninstall_conky
+      zenity --text-info --width=600 --height=400 --title="Uninstallation Log" --filename="$LOGFILE"
+      ;;
+    3)
+      start_conky
+      ;;
+    4)
+      stop_conky
+      ;;
+    5)
+      restart_conky
+      ;;
+    6)
+      check_rkhunter
+      ;;
+    7)
+      restore_system
+      ;;
+    8)
+      clear_log
+      install_rkhunter_service
+      zenity --text-info --width=600 --height=400 --title="RKHunter Service Log" --filename="$LOGFILE"
+      ;;
+    9)
+      clear_log
+      remove_rkhunter_service
+      zenity --text-info --width=600 --height=400 --title="RKHunter Removal Log" --filename="$LOGFILE"
+      ;;
+    10)
+      create_launcher
+      ;;
+    11)
+      zenity --info --width=300 --text="Goodbye!"
+      exit 0
+      ;;
+    *)
+      zenity --error --width=300 --text="Invalid option."
+      ;;
+  esac
+done
+
 WHITE='\033[1;37m'
 RED='\033[1;31m'
 NC='\033[0m'  # No color
