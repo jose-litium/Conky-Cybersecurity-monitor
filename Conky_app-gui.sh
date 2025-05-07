@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Conky Cybersecurity Monitor – Full App (Improved Version)
 #
-# This script installs, configures, and manages Conky together with security tools
-# (such as RKHunter) using a dialog-based graphical interface.
-# It also creates a desktop launcher to start the application without a terminal.
+# Este script instala, configura y gestiona Conky junto con herramientas de seguridad
+# (como RKHunter) utilizando una interfaz gráfica basada en dialog.
+# También crea un lanzador de escritorio para iniciar la aplicación sin una terminal.
 #
-# Author: jose-litium 2025
+# Autor: jose-litium 2025
 # GitHub: https://github.com/jose-litium
 # LinkedIn: https://www.linkedin.com/in/josemmanueldiaz/
-# Date: 2025-02-17 (Modified: 2025-03-19)
+# Fecha: 2025-02-17 (Modificado: 2025-05-07)
 
 ########################################
 # Global Configuration
@@ -31,6 +31,11 @@ NC='\033[0m'
 ########################################
 # Utility functions (with dialog)
 ########################################
+
+# Check if a command is installed
+function is_command_installed() {
+    command -v "$1" &>/dev/null
+}
 
 # Confirmation dialog
 function dconfirm() {
@@ -70,16 +75,16 @@ function setup_sudoers() {
 ########################################
 
 function log() {
-  echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOGFILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOGFILE"
 }
 
 function clear_log_file() {
-  > "$LOGFILE"
+    > "$LOGFILE"
 }
 
 function run_cmd() {
-  log "Running: $*"
-  "$@" >> "$LOGFILE" 2>&1
+    log "Running: $*"
+    "$@" >> "$LOGFILE" 2>&1
 }
 
 ########################################
@@ -111,15 +116,15 @@ function check_install() {
 function configure_sensors() {
     echo -e "${BLUE}Configuring hardware sensors (lm-sensors)...${NC}"
     if command -v sensors &>/dev/null; then
-         if dconfirm "Do you want to run sensors-detect to automatically configure your sensors?"; then
-             echo -e "${BLUE}Running sensors-detect...${NC}"
-             yes | sudo sensors-detect > /dev/null 2>&1
-             dmsg "Sensors configuration completed."
-         else
-             dmsg "Skipped configuration with sensors-detect."
-         fi
+            if dconfirm "Do you want to run sensors-detect to automatically configure your sensors?"; then
+                echo -e "${BLUE}Running sensors-detect...${NC}"
+                yes | sudo sensors-detect > /dev/null 2>&1
+                dmsg "Sensors configuration completed."
+            else
+                dmsg "Skipped configuration with sensors-detect."
+            fi
     else
-         dmsg "lm-sensors is not installed. Skipping sensor configuration."
+        dmsg "lm-sensors is not installed. Skipping sensor configuration."
     fi
 }
 
@@ -185,7 +190,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'rkhunter --update > /dev/null 2>&1 && rkhunter --propupd > /dev/null 2>&1 && rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null && grep -i "warning" /tmp/rkhunter_result.txt > /tmp/rkhunter_warnings.txt'
+ExecStart=/bin/bash -c 'rkhunter --update > /dev/null 2>&1 && rkhunter --propupd > /dev/null 2>&1 && rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null && grep -i "warning" /tmp/rkhunter_warnings.txt > /tmp/rkhunter_warnings.txt'
 RemainAfterExit=yes
 EOL
 
@@ -307,6 +312,92 @@ EOF
 }
 
 ########################################
+# Dependency Check Function
+########################################
+function check_dependencies() {
+    local missing_dependencies=()
+    local installed_apt=false
+    local installed_dnf=false
+    local installed_pacman=false
+
+    # Check for dialog
+    if ! is_command_installed "dialog"; then
+        missing_dependencies+=("dialog")
+    fi
+    # Check for conky
+    if ! is_command_installed "conky"; then
+        missing_dependencies+=("conky")
+    fi
+    # Check for curl
+    if ! is_command_installed "curl"; then
+        missing_dependencies+=("curl")
+    fi
+    # Check for net-tools
+    if ! is_command_installed "netstat"; then
+        missing_dependencies+=("net-tools")
+    fi
+     # Check for lsof
+    if ! is_command_installed "lsof"; then
+        missing_dependencies+=("lsof")
+    fi
+    # Check for xdg-utils
+    if ! is_command_installed "xdg-utils"; then
+        missing_dependencies+=("xdg-utils")
+    fi
+    # Check for rkhunter
+    if ! is_command_installed "rkhunter"; then
+        missing_dependencies+=("rkhunter")
+    fi
+    # Check for lm-sensors
+    if ! is_command_installed "sensors"; then
+        missing_dependencies+=("lm-sensors")
+    fi
+    # Check for nmap
+    if ! is_command_installed "nmap"; then
+        missing_dependencies+=("nmap")
+    fi
+    # Check for upower
+    if ! is_command_installed "upower"; then
+        missing_dependencies+=("upower")
+    fi
+    # Check for systemd
+    if ! is_command_installed "systemctl"; then
+        missing_dependencies+=("systemd")
+    fi
+
+    if [ ${#missing_dependencies[@]} -gt 0 ]; then
+        echo -e "${RED}Faltan las siguientes dependencias:${NC}"
+        for dep in "${missing_dependencies[@]}"; do
+            echo "- $dep"
+        done
+        echo -e "${YELLOW}Por favor, instala las dependencias que faltan usando el gestor de paquetes de tu sistema.${NC}"
+
+        # Check for common package managers
+        if is_command_installed "apt"; then
+            installed_apt=true
+            echo "Ejemplo para sistemas Debian/Ubuntu: sudo apt install ${missing_dependencies[*]}"
+        fi
+        if is_command_installed "dnf"; then
+            installed_dnf=true
+            echo "Ejemplo para sistemas Fedora/CentOS/RHEL: sudo dnf install ${missing_dependencies[*]}"
+        elif is_command_installed "yum"; then
+            installed_dnf=true
+            echo "Ejemplo para sistemas Fedora/CentOS/RHEL: sudo yum install ${missing_dependencies[*]}"
+        fi
+        if is_command_installed "pacman"; then
+            installed_pacman=true
+            echo "Ejemplo para sistemas Arch Linux: sudo pacman -S ${missing_dependencies[*]}"
+        fi
+
+        # Suggest all if no common package manager is found
+        if ! $installed_apt && ! $installed_dnf && ! $installed_pacman; then
+            echo "No se detectó un gestor de paquetes común. Por favor, consulta la documentación de tu distribución para instalar las dependencias."
+        fi
+        exit 1
+    fi
+}
+
+########################################
 # Main Action Functions
 ########################################
 
@@ -364,9 +455,9 @@ conky.config = {
 
 conky.text = [[
 \${exec /home/${USERNAME}/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
-\${color yellow}\${time %H:%M:%S}       Vietnam (GMT+7)
-\${color cyan}\${execi 10 TZ='Europe/Madrid' date '+%H:%M:%S'}       Madrid (GMT+1)
-\${color green}\${execi 10 TZ='Australia/Sydney' date '+%H:%M:%S'}       Sydney (GMT+10)
+\${color yellow}\${time %H:%M:%S}      Vietnam (GMT+7)
+\${color cyan}\${execi 10 TZ='Europe/Madrid' date '+%H:%M:%S'}      Madrid (GMT+1)
+\${color green}\${execi 10 TZ='Australia/Sydney' date '+%H:%M:%S'}      Sydney (GMT+10)
 \${color magenta}\${execi 10 TZ='America/New_York' date '+%H:%M:%S'}      New York (GMT-5)
 
 \${color magenta}------ Hardware Indicators ------
@@ -491,12 +582,12 @@ function check_rkhunter() {
     sudo rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null
     grep -i "warning" /tmp/rkhunter_result.txt > "$WARN_LOG"
     if [ -s "$WARN_LOG" ]; then
-         local count
-         count=$(wc -l < "$WARN_LOG")
-         dmsg "You have ${count} alert(s).\nCheck warnings with: cat $WARN_LOG"
+        local count
+        count=$(wc -l < "$WARN_LOG")
+        dmsg "You have ${count} alert(s).\nCheck warnings with: cat $WARN_LOG"
     else
-         dmsg "No alerts detected."
-         rm -f "$WARN_LOG"
+        dmsg "No alerts detected."
+        rm -f "$WARN_LOG"
     fi
 }
 
@@ -507,56 +598,56 @@ function restore_system() {
         local ESSENTIAL_PACKAGES=("ubuntu-desktop" "gdm3" "nautilus" "gvfs" "gvfs-backends" "gvfs-daemons" "gvfs-common" "ubuntu-standard" "ubuntu-minimal" "dbus-x11" "network-manager")
         local note
         for pkg in "${ESSENTIAL_PACKAGES[@]}"; do
-             case "$pkg" in
-                  "ubuntu-desktop")
-                       note="(Installs the default Ubuntu desktop environment)";;
-                  "gdm3")
-                       note="(Installs the GNOME Display Manager)";;
-                  "nautilus")
-                       note="(Installs the GNOME file manager)";;
-                  "gvfs")
-                       note="(Installs the GNOME Virtual File System)";;
-                  "gvfs-backends")
-                       note="(Provides backends for GVFS)";;
-                  "gvfs-daemons")
-                       note="(Installs daemons for GVFS)";;
-                  "gvfs-common")
-                       note="(Common files for GVFS)";;
-                  "ubuntu-standard")
-                       note="(Standard packages for Ubuntu)";;
-                  "ubuntu-minimal")
-                       note="(Minimum required packages for Ubuntu)";;
-                  "dbus-x11")
-                       note="(X11 support for DBus)";;
-                  "network-manager")
-                       note="(Manages network connections)";;
-                  *)
-                       note="(No additional information)";;
-             esac
-             if dconfirm "Reinstall $pkg $note?"; then
-                  sudo apt install -y "$pkg"
-             else
-                  echo -e "${YELLOW}Skipping reinstallation of $pkg.${NC}"
-             fi
+            case "$pkg" in
+                "ubuntu-desktop")
+                    note="(Installs the default Ubuntu desktop environment)";;
+                "gdm3")
+                    note="(Installs the GNOME Display Manager)";;
+                "nautilus")
+                    note="(Installs the GNOME file manager)";;
+                "gvfs")
+                    note="(Installs the GNOME Virtual File System)";;
+                "gvfs-backends")
+                    note="(Provides backends for GVFS)";;
+                "gvfs-daemons")
+                    note="(Installs daemons for GVFS)";;
+                "gvfs-common")
+                    note="(Common files for GVFS)";;
+                "ubuntu-standard")
+                    note="(Standard packages for Ubuntu)";;
+                "ubuntu-minimal")
+                    note="(Minimum required packages for Ubuntu)";;
+                "dbus-x11")
+                    note="(X11 support for DBus)";;
+                "network-manager")
+                    note="(Manages network connections)";;
+                *)
+                    note="(No additional information)";;
+            esac
+            if dconfirm "Reinstall $pkg $note?"; then
+                sudo apt install -y "$pkg"
+            else
+                echo -e "${YELLOW}Skipping reinstallation of $pkg.${NC}"
+            fi
         done
         if dconfirm "Run 'sudo apt --fix-broken install -y'? (This will fix broken dependencies)"; then
-             sudo apt --fix-broken install -y
+            sudo apt --fix-broken install -y
         else
-             echo -e "${YELLOW}Skipping broken install fixes.${NC}"
+            echo -e "${YELLOW}Skipping broken install fixes.${NC}"
         fi
         if ! dpkg -l | grep -qw google-chrome-stable; then
-             if dconfirm "Google Chrome is not installed. Do you want to install it?"; then
-                 wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome-stable_current_amd64.deb
-                 sudo dpkg -i /tmp/google-chrome-stable_current_amd64.deb || sudo apt -f install -y
-             else
-                 echo -e "${YELLOW}Skipping Google Chrome installation.${NC}"
-             fi
+            if dconfirm "Google Chrome is not installed. Do you want to install it?"; then
+                wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome-stable_current_amd64.deb
+                sudo dpkg -i /tmp/google-chrome-stable_current_amd64.deb || sudo apt -f install -y
+            else
+                echo -e "${YELLOW}Skipping Google Chrome installation.${NC}"
+            fi
         else
-             if dconfirm "Google Chrome is already installed. Do you want to reinstall it?"; then
-                 sudo apt install --reinstall -y google-chrome-stable
-             else
-                 echo -e "${YELLOW}Keeping the current Google Chrome installation.${NC}"
-             fi
+            if dconfirm "Google Chrome is already installed. Do you want to reinstall it?"; then
+                sudo apt install --reinstall -y google-chrome-stable
+            else
+                echo -e "${YELLOW}Keeping the current Google Chrome installation.${NC}"
+            fi
         fi
         dmsg "Restoration of essential packages completed."
     else
@@ -567,6 +658,9 @@ function restore_system() {
 ########################################
 # Main Menu (GUI with dialog)
 ########################################
+
+# Perform initial dependency check
+check_dependencies
 
 # Welcome banner
 dialog --clear --title "Welcome to Conky Cybersecurity Monitor" --msgbox "This application installs, configures, and manages Conky together with security tools like RKHunter and a temperature monitor. It also sets up a desktop launcher and offers options to view logs, remove temporary files, install pentesting tools, and clean system logs.\n\nDeveloped by jose-litium 2025\nGitHub: https://github.com/jose-litium\nLinkedIn: https://www.linkedin.com/in/josemmanueldiaz/" 15 70
