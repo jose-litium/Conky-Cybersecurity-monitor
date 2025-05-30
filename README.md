@@ -110,7 +110,6 @@ flowchart TD
     C17 --> E[Goodbye Message & Exit]
 ```
 
----
 
 ## Main Script Functions
 
