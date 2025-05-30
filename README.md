@@ -45,7 +45,7 @@ chmod +x conky_cybersecurity_monitor.sh
 <img src="https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/1.png" alt="Final version look" style="width:50%; height:auto;" />
 
 *Visual dialog interface with color-coded options*
-
+---
 ## 🖥Interactive Menu
 
 <img src="https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/2.png" alt="Interactive Menu" style="width:50%;" />
