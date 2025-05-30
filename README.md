@@ -41,11 +41,11 @@ chmod +x conky_cybersecurity_monitor.sh
 
 ---
 ## Looks of the final version  
-![](https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/1.png)  
+![](https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/1.png -p 5,5)  
 *Visual dialog interface with color-coded options*
 
 ## 🖥Interactive Menu  
-![](https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/2.png)  
+![](https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/2.png -p 5,5)  
 *Visual dialog interface with color-coded options*
 
 ---
