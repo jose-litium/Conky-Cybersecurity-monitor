@@ -41,12 +41,17 @@ chmod +x conky_cybersecurity_monitor.sh
 
 ---
 ## Looks of the final version  
-![](https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/1.png -p 5,5)  
-*Visual dialog interface with color-coded options*
+-- Asegúrate de que tu sección 'conky.text' esté configurada así o similar
+conky.text = [[
 
-## 🖥Interactive Menu  
-![](https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/2.png -p 5,5)  
-*Visual dialog interface with color-coded options*
+${image /ruta/a/tu/Conky-Cybersecurity-monitor/1.png -p 5,5 -s 75x300}
+
+-- Puedes ajustar la posición 'Y' para la segunda imagen para que no se superponga
+${image /ruta/a/tu/Conky-Cybersecurity-monitor/2.png -p 5,320 -s 200x200}
+
+-- Aquí iría el resto de tu configuración de Conky (texto, variables, etc.)
+
+]]
 
 ---
 
