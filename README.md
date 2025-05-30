@@ -3,12 +3,12 @@
 
 ---
 
-## 🚀 Overview  
+##  Overview  
 Transform your Linux desktop into a real-time cybersecurity monitoring station with this comprehensive dialog-driven interface. The script integrates security tools, hardware sensors, and pentesting utilities into a sleek Conky dashboard.
 
 ---
 
-## 📋 Requirements  
+##  Requirements  
 | **Component**       | **Details**                                      |
 |---------------------|--------------------------------------------------|
 | **Distributions**   | Ubuntu/Debian (18.04+ recommended)              |
@@ -17,7 +17,7 @@ Transform your Linux desktop into a real-time cybersecurity monitoring station w
 
 ---
 
-## ⚙️ Installation  
+##  Installation  
 ```bash
 wget https://raw.githubusercontent.com/jose-litium/conky-cybersecurity-monitor/main/conky_cybersecurity_monitor.sh
 chmod +x conky_cybersecurity_monitor.sh
@@ -28,7 +28,7 @@ chmod +x conky_cybersecurity_monitor.sh
 
 ---
 
-## 🌟 Key Features  
+##  Key Features  
 - **Automated Dashboard Setup**: Conky + RKHunter + sensors  
 - **Pentesting Toolkit**: One-click install:  
   ```nmap, sqlmap, aircrack-ng, hydra, john, metasploit, wireshark```  
@@ -40,21 +40,24 @@ chmod +x conky_cybersecurity_monitor.sh
 - **Service Management**: systemd integration (user/system)  
 
 ---
+## Looks of the final version  
+![](https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/1.png)  
+*Visual dialog interface with color-coded options*
 
-## 🖥️ Interactive Menu  
+## 🖥Interactive Menu  
 ![](https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/2.png)  
 *Visual dialog interface with color-coded options*
 
 ---
 
-## 🛠️ Configuration  
+## Configuration  
 **Conky Config**: `~/.config/conky/conky.conf`  
 **Helper Scripts**: `~/.local/conky_app/`  
 **Customize**: Colors, layout, and monitored metrics via config file  
 
 ---
 
-## 🔒 Security Design  
+## Security Design  
 - Minimal sudo permissions via `/etc/sudoers.d/conky`  
 - All operations require explicit confirmation  
 - Audit logs: `/tmp/conky_gui.log`  
@@ -62,7 +65,7 @@ chmod +x conky_cybersecurity_monitor.sh
 
 ---
 
-## 📂 System Flow  
+##  System Flow  
 ```mermaid
 flowchart TD
     A[Start: Dependency Check] --> B{Main Menu}
@@ -83,7 +86,7 @@ flowchart TD
 
 ---
 
-## 🧩 Uninstallation  
+##  Uninstallation  
 Run script → Select **"Uninstall Conky"** → Complete removal of:  
 - Config files  
 - Services  
@@ -92,7 +95,7 @@ Run script → Select **"Uninstall Conky"** → Complete removal of:
 
 ---
 
-## 👥 Credits  
+##  Credits  
 **Author**: jose-litium (2025)  
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/jose-litium) 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-0A66C2?logo=linkedin)](https://www.linkedin.com/in/josemmanueldiaz/)  
@@ -101,5 +104,5 @@ Run script → Select **"Uninstall Conky"** → Complete removal of:
 
 ---
 
-> **Enjoy your real-time security dashboard!** ✨  
+> **Enjoy your real-time security dashboard!**   
 > Report issues or contribute on [GitHub](https://github.com/jose-litium)
