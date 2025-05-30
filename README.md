@@ -108,7 +108,8 @@ flowchart TD
     C15 --> D15[Install Security Tools]
     C16 --> D16[Vacuum and Truncate System Logs]
     C17 --> E[Goodbye Message & Exit]
-```
+---
+---
 
 
 ## Main Script Functions
