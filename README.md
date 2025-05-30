@@ -42,7 +42,7 @@ chmod +x conky_cybersecurity_monitor.sh
 ---
 
 ## 🖥️ Interactive Menu  
-![](https://via.placeholder.com/800x500/222436/FFFFFF?text=Conky+Cybersecurity+Menu+Preview)  
+![](https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/2.png)  
 *Visual dialog interface with color-coded options*
 
 ---
