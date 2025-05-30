@@ -40,18 +40,18 @@ chmod +x conky_cybersecurity_monitor.sh
 - **Service Management**: systemd integration (user/system)  
 
 ---
-## Looks of the final version  
--- Asegúrate de que tu sección 'conky.text' esté configurada así o similar
-conky.text = [[
+## Looks of the final version
 
-${image /ruta/a/tu/Conky-Cybersecurity-monitor/1.png -p 5,5 -s 75x300}
+<img src="https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/1.png" alt="Final version look" width="50%" />
 
--- Puedes ajustar la posición 'Y' para la segunda imagen para que no se superponga
-${image /ruta/a/tu/Conky-Cybersecurity-monitor/2.png -p 5,320 -s 200x200}
+*Visual dialog interface with color-coded options*
 
--- Aquí iría el resto de tu configuración de Conky (texto, variables, etc.)
+## 🖥Interactive Menu
 
-]]
+<img src="https://github.com/jose-litium/Conky-Cybersecurity-monitor/blob/main/2.png" alt="Interactive Menu" width="50%" />
+
+*Visual dialog interface with color-coded options*
+
 
 ---
 
