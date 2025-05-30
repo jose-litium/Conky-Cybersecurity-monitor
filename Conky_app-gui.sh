@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 # Conky Cybersecurity Monitor – Full App (Improved Version)
 #
 # Este script instala, configura y gestiona Conky junto con herramientas de seguridad
@@ -132,6 +133,7 @@ function create_rkhunter_scan_script() {
     local SCRIPT="$INSTALL_DIR/rkhunter_scan.sh"
     cat <<'EOF' > "$SCRIPT"
 #!/usr/bin/env bash
+
 sudo rkhunter --update > /dev/null 2>&1 && \
 sudo rkhunter --propupd > /dev/null 2>&1 && \
 sudo rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null && \
@@ -145,6 +147,7 @@ function create_temp_monitor_script() {
     local SCRIPT="$INSTALL_DIR/temp_monitor.sh"
     cat <<'EOF' > "$SCRIPT"
 #!/usr/bin/env bash
+
 while true; do
     temp=$(sensors | grep -Eo '\+[0-9]+(\.[0-9]+)?°C' | head -n1)
     temp_val=$(echo "$temp" | sed 's/[+°C]//g')
@@ -174,6 +177,7 @@ Restart=always
 [Install]
 WantedBy=default.target
 EOL
+
     systemctl --user daemon-reload
     systemctl --user enable temp_monitor.service
     systemctl --user start temp_monitor.service
@@ -312,58 +316,29 @@ EOF
 }
 
 ########################################
-# Dependency Check Function
+# Dependency Check Function (CORREGIDA)
 ########################################
 function check_dependencies() {
+    declare -A required_commands=(
+        ["dialog"]="dialog"
+        ["conky"]="conky"
+        ["curl"]="curl"
+        ["netstat"]="net-tools"
+        ["lsof"]="lsof"
+        ["xdg-open"]="xdg-utils"
+        ["rkhunter"]="rkhunter"
+        ["sensors"]="lm-sensors"
+        ["nmap"]="nmap"
+        ["upower"]="upower"
+    )
+    
     local missing_dependencies=()
-    local installed_apt=false
-    local installed_dnf=false
-    local installed_pacman=false
-
-    # Check for dialog
-    if ! is_command_installed "dialog"; then
-        missing_dependencies+=("dialog")
-    fi
-    # Check for conky
-    if ! is_command_installed "conky"; then
-        missing_dependencies+=("conky")
-    fi
-    # Check for curl
-    if ! is_command_installed "curl"; then
-        missing_dependencies+=("curl")
-    fi
-    # Check for net-tools
-    if ! is_command_installed "netstat"; then
-        missing_dependencies+=("net-tools")
-    fi
-     # Check for lsof
-    if ! is_command_installed "lsof"; then
-        missing_dependencies+=("lsof")
-    fi
-    # Check for xdg-utils
-    if ! is_command_installed "xdg-utils"; then
-        missing_dependencies+=("xdg-utils")
-    fi
-    # Check for rkhunter
-    if ! is_command_installed "rkhunter"; then
-        missing_dependencies+=("rkhunter")
-    fi
-    # Check for lm-sensors
-    if ! is_command_installed "sensors"; then
-        missing_dependencies+=("lm-sensors")
-    fi
-    # Check for nmap
-    if ! is_command_installed "nmap"; then
-        missing_dependencies+=("nmap")
-    fi
-    # Check for upower
-    if ! is_command_installed "upower"; then
-        missing_dependencies+=("upower")
-    fi
-    # Check for systemd
-    if ! is_command_installed "systemctl"; then
-        missing_dependencies+=("systemd")
-    fi
+    
+    for cmd in "${!required_commands[@]}"; do
+        if ! is_command_installed "$cmd"; then
+            missing_dependencies+=("${required_commands[$cmd]}")
+        fi
+    done
 
     if [ ${#missing_dependencies[@]} -gt 0 ]; then
         echo -e "${RED}Faltan las siguientes dependencias:${NC}"
@@ -372,27 +347,18 @@ function check_dependencies() {
         done
         echo -e "${YELLOW}Por favor, instala las dependencias que faltan usando el gestor de paquetes de tu sistema.${NC}"
 
-        # Check for common package managers
         if is_command_installed "apt"; then
-            installed_apt=true
             echo "Ejemplo para sistemas Debian/Ubuntu: sudo apt install ${missing_dependencies[*]}"
-        fi
-        if is_command_installed "dnf"; then
-            installed_dnf=true
-            echo "Ejemplo para sistemas Fedora/CentOS/RHEL: sudo dnf install ${missing_dependencies[*]}"
+        elif is_command_installed "dnf"; then
+            echo "Ejemplo para sistemas Fedora: sudo dnf install ${missing_dependencies[*]}"
         elif is_command_installed "yum"; then
-            installed_dnf=true
-            echo "Ejemplo para sistemas Fedora/CentOS/RHEL: sudo yum install ${missing_dependencies[*]}"
+            echo "Ejemplo para sistemas RHEL/CentOS: sudo yum install ${missing_dependencies[*]}"
+        elif is_command_installed "pacman"; then
+            echo "Ejemplo para sistemas Arch: sudo pacman -S ${missing_dependencies[*]}"
+        else
+            echo "No se detectó un gestor de paquetes común. Por favor, instala manualmente."
         fi
-        if is_command_installed "pacman"; then
-            installed_pacman=true
-            echo "Ejemplo para sistemas Arch Linux: sudo pacman -S ${missing_dependencies[*]}"
-        fi
-
-        # Suggest all if no common package manager is found
-        if ! $installed_apt && ! $installed_dnf && ! $installed_pacman; then
-            echo "No se detectó un gestor de paquetes común. Por favor, consulta la documentación de tu distribución para instalar las dependencias."
-        fi
+        
         exit 1
     fi
 }
