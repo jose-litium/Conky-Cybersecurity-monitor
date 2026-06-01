@@ -134,10 +134,12 @@ function create_rkhunter_scan_script() {
     cat <<'EOF' > "$SCRIPT"
 #!/usr/bin/env bash
 
+TMP_RESULT=$(mktemp /tmp/rkhunter_result.XXXXXX)
 sudo rkhunter --update > /dev/null 2>&1 && \
 sudo rkhunter --propupd > /dev/null 2>&1 && \
-sudo rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null && \
-grep -i "warning" /tmp/rkhunter_result.txt > /tmp/rkhunter_warnings.txt
+sudo rkhunter --check --sk > "$TMP_RESULT" 2>/dev/null && \
+grep -i "warning" "$TMP_RESULT" > /tmp/rkhunter_warnings.txt
+rm -f "$TMP_RESULT"
 EOF
     chmod +x "$SCRIPT"
     log "RKHunter scan script created at $SCRIPT."
@@ -194,7 +196,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'rkhunter --update > /dev/null 2>&1 && rkhunter --propupd > /dev/null 2>&1 && rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null && grep -i "warning" /tmp/rkhunter_warnings.txt > /tmp/rkhunter_warnings.txt'
+ExecStart=/bin/bash -c 'TMP_RESULT=\$\$(mktemp /tmp/rkhunter_result.XXXXXX); rkhunter --update > /dev/null 2>&1 && rkhunter --propupd > /dev/null 2>&1 && rkhunter --check --sk > "\$\$TMP_RESULT" 2>/dev/null; grep -i "warning" "\$\$TMP_RESULT" > /tmp/rkhunter_warnings.txt; rm -f "\$\$TMP_RESULT"'
 RemainAfterExit=yes
 EOL
 
@@ -232,7 +234,7 @@ function remove_rkhunter_service() {
 ########################################
 
 function delete_temporaries() {
-    rm -f /tmp/rkhunter_result.txt /tmp/rkhunter_warnings.txt /tmp/cpu_temp.txt
+    rm -f /tmp/rkhunter_warnings.txt /tmp/cpu_temp.txt
     dmsg "Temporary files deleted."
     log "Temporary files deleted."
 }
@@ -545,8 +547,11 @@ function check_rkhunter() {
     local WARN_LOG="/tmp/rkhunter_warnings.txt"
     sudo rkhunter --update > /dev/null 2>&1
     sudo rkhunter --propupd > /dev/null 2>&1
-    sudo rkhunter --check --sk > /tmp/rkhunter_result.txt 2>/dev/null
-    grep -i "warning" /tmp/rkhunter_result.txt > "$WARN_LOG"
+    local TMP_RESULT
+    TMP_RESULT=$(mktemp /tmp/rkhunter_result.XXXXXX)
+    sudo rkhunter --check --sk > "$TMP_RESULT" 2>/dev/null
+    grep -i "warning" "$TMP_RESULT" > "$WARN_LOG"
+    rm -f "$TMP_RESULT"
     if [ -s "$WARN_LOG" ]; then
         local count
         count=$(wc -l < "$WARN_LOG")
