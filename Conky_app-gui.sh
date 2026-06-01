@@ -19,6 +19,9 @@ LOGFILE="/tmp/conky_gui.log"
 INSTALL_DIR="$HOME/.local/conky_app"
 mkdir -p "$INSTALL_DIR"
 
+# Track if apt update has been executed
+APT_HAS_UPDATED=""
+
 # Define colors for terminal output (for logs)
 BLUE='\033[1;34m'
 CYAN='\033[1;36m'
@@ -106,7 +109,10 @@ check_install() {
     else
         log "$pkg is not installed."
         if dconfirm "Do you want to install $pkg?"; then
-            sudo apt update
+            if [ -z "$APT_HAS_UPDATED" ]; then
+                sudo apt update
+                APT_HAS_UPDATED=1
+            fi
             sudo apt install -y "$pkg"
         else
             dmsg "Skipped installing $pkg. This may affect functionality."
@@ -376,7 +382,10 @@ install_conky() {
     log "Starting Conky installation..."
     check_user_systemd
     echo -e "${BLUE}Updating package lists...${NC}"
-    sudo apt update
+    if [ -z "$APT_HAS_UPDATED" ]; then
+        sudo apt update
+        APT_HAS_UPDATED=1
+    fi
 
     local APPS=("conky-all" "curl" "net-tools" "lsof" "xdg-utils" "rkhunter" "lm-sensors" "nmap" "upower")
     for pkg in "${APPS[@]}"; do
@@ -560,7 +569,10 @@ check_rkhunter() {
 restore_system() {
     if dconfirm "Restore essential system packages?"; then
         echo -e "${BLUE}Restoring essential system packages...${NC}"
-        sudo apt update
+        if [ -z "$APT_HAS_UPDATED" ]; then
+            sudo apt update
+            APT_HAS_UPDATED=1
+        fi
         local ESSENTIAL_PACKAGES=("ubuntu-desktop" "gdm3" "nautilus" "gvfs" "gvfs-backends" "gvfs-daemons" "gvfs-common" "ubuntu-standard" "ubuntu-minimal" "dbus-x11" "network-manager")
         local note
         for pkg in "${ESSENTIAL_PACKAGES[@]}"; do
