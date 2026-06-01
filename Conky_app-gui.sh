@@ -66,7 +66,7 @@ function dmenu() {
 ########################################
 
 function setup_sudoers() {
-    echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat, /usr/bin/sensors, /usr/bin/journalctl, /usr/bin/curl, /usr/bin/hostname -I, /usr/bin/rkhunter" | sudo tee /etc/sudoers.d/conky > /dev/null
+    echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/netstat, /usr/bin/sensors, /usr/bin/journalctl -n 5 -p 3 -u ssh.service --no-pager, /usr/bin/curl -s ifconfig.me, /usr/bin/hostname -I, /usr/bin/rkhunter, /usr/bin/cat /tmp/cpu_temp.txt" | sudo tee /etc/sudoers.d/conky > /dev/null
     sudo chmod 0440 /etc/sudoers.d/conky
     log "Sudoers updated for user $USER."
 }
