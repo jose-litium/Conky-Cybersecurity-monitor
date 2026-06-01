@@ -19,6 +19,9 @@ LOGFILE="/tmp/conky_gui.log"
 INSTALL_DIR="$HOME/.local/conky_app"
 mkdir -p "$INSTALL_DIR"
 
+# Track if apt update has been executed
+APT_HAS_UPDATED=""
+
 # Define colors for terminal output (for logs)
 BLUE='\033[1;34m'
 CYAN='\033[1;36m'
@@ -34,23 +37,23 @@ NC='\033[0m'
 ########################################
 
 # Check if a command is installed
-function is_command_installed() {
+is_command_installed() {
     command -v "$1" &>/dev/null
 }
 
 # Confirmation dialog
-function dconfirm() {
+dconfirm() {
     dialog --clear --yesno "$1" 7 60
     return $?
 }
 
 # Message dialog
-function dmsg() {
+dmsg() {
     dialog --clear --msgbox "$1" 10 60
 }
 
 # Menu dialog (returns the chosen option)
-function dmenu() {
+dmenu() {
     local title="$1"
     shift
     local options=("$@")
@@ -65,7 +68,7 @@ function dmenu() {
 # Sudoers Configuration
 ########################################
 
-function setup_sudoers() {
+setup_sudoers() {
     echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat, /usr/bin/sensors, /usr/bin/journalctl, /usr/bin/curl, /usr/bin/hostname -I, /usr/bin/rkhunter" | sudo tee /etc/sudoers.d/conky > /dev/null
     sudo chmod 0440 /etc/sudoers.d/conky
     log "Sudoers updated for user $USER."
@@ -75,15 +78,15 @@ function setup_sudoers() {
 # Logging Functions
 ########################################
 
-function log() {
+log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOGFILE"
 }
 
-function clear_log_file() {
+clear_log_file() {
     > "$LOGFILE"
 }
 
-function run_cmd() {
+run_cmd() {
     log "Running: $*"
     "$@" >> "$LOGFILE" 2>&1
 }
@@ -92,21 +95,24 @@ function run_cmd() {
 # Internal Checks
 ########################################
 
-function check_user_systemd() {
+check_user_systemd() {
     if ! systemctl --user 2>/dev/null; then
         dmsg "User-level systemd is not available.\nPlease use a version of Ubuntu/Debian with a desktop environment (18.04+)."
         exit 1
     fi
 }
 
-function check_install() {
+check_install() {
     local pkg="$1"
-    if dpkg -l | grep -qw "$pkg"; then
+    if dpkg -s "$pkg" &>/dev/null; then
         log "$pkg is already installed."
     else
         log "$pkg is not installed."
         if dconfirm "Do you want to install $pkg?"; then
-            sudo apt update
+            if [ -z "$APT_HAS_UPDATED" ]; then
+                sudo apt update
+                APT_HAS_UPDATED=1
+            fi
             sudo apt install -y "$pkg"
         else
             dmsg "Skipped installing $pkg. This may affect functionality."
@@ -114,7 +120,7 @@ function check_install() {
     fi
 }
 
-function configure_sensors() {
+configure_sensors() {
     echo -e "${BLUE}Configuring hardware sensors (lm-sensors)...${NC}"
     if command -v sensors &>/dev/null; then
             if dconfirm "Do you want to run sensors-detect to automatically configure your sensors?"; then
@@ -129,7 +135,7 @@ function configure_sensors() {
     fi
 }
 
-function create_rkhunter_scan_script() {
+create_rkhunter_scan_script() {
     local SCRIPT="$INSTALL_DIR/rkhunter_scan.sh"
     cat <<'EOF' > "$SCRIPT"
 #!/usr/bin/env bash
@@ -147,7 +153,7 @@ EOF
     log "RKHunter scan script created at $SCRIPT."
 }
 
-function create_temp_monitor_script() {
+create_temp_monitor_script() {
     local SCRIPT="$INSTALL_DIR/temp_monitor.sh"
     cat <<'EOF' > "$SCRIPT"
 #!/usr/bin/env bash
@@ -167,7 +173,7 @@ EOF
     log "Temperature monitor script created at $SCRIPT."
 }
 
-function install_temp_monitor_service() {
+install_temp_monitor_service() {
     mkdir -p ~/.config/systemd/user
     cat <<EOL > ~/.config/systemd/user/temp_monitor.service
 [Unit]
@@ -188,7 +194,7 @@ EOL
     log "Temperature monitor service installed and started."
 }
 
-function install_rkhunter_service() {
+install_rkhunter_service() {
     echo -e "${BLUE}Installing automatic RKHunter scan service...${NC}"
     sudo tee /etc/systemd/system/rkhunter-auto.service > /dev/null <<EOL
 [Unit]
@@ -220,7 +226,7 @@ EOL
     log "RKHunter service and timer installed."
 }
 
-function remove_rkhunter_service() {
+remove_rkhunter_service() {
     echo -e "${RED}Removing automatic RKHunter scan service and timer...${NC}"
     sudo systemctl disable rkhunter-auto.timer
     sudo systemctl stop rkhunter-auto.timer
@@ -235,19 +241,19 @@ function remove_rkhunter_service() {
 # Functions: Delete Logs and Temporary Files
 ########################################
 
-function delete_temporaries() {
+delete_temporaries() {
     rm -f /tmp/rkhunter_warnings.txt /tmp/cpu_temp.txt
     dmsg "Temporary files deleted."
     log "Temporary files deleted."
 }
 
-function clear_logs() {
+clear_logs() {
     clear_log_file
     dmsg "Log file cleared."
     log "Log file cleared."
 }
 
-function view_logs() {
+view_logs() {
     if [ -f "$LOGFILE" ]; then
         dialog --textbox "$LOGFILE" 20 70
     else
@@ -255,7 +261,7 @@ function view_logs() {
     fi
 }
 
-function view_rkhunter_warnings() {
+view_rkhunter_warnings() {
     local WARN_LOG="/tmp/rkhunter_warnings.txt"
     if [ -f "$WARN_LOG" ]; then
         dialog --textbox "$WARN_LOG" 20 70
@@ -268,7 +274,7 @@ function view_rkhunter_warnings() {
 # Function: Install Pentesting Tools
 ########################################
 
-function install_pentest_tools() {
+install_pentest_tools() {
     if dconfirm "Install pentesting tools? (Already-installed tools will be skipped)"; then
         local TOOLS=("nmap" "sqlmap" "aircrack-ng" "hydra" "john" "metasploit-framework" "wireshark")
         for tool in "${TOOLS[@]}"; do
@@ -285,7 +291,7 @@ function install_pentest_tools() {
 # Function: Clean /var/log
 ########################################
 
-function clean_var_log() {
+clean_var_log() {
     if dconfirm "Clean /var/log? This will vacuum journal logs to 1 day and truncate log files."; then
         sudo journalctl --vacuum-time=1d
         sudo find /var/log -type f -exec truncate -s 0 {} \;
@@ -300,7 +306,7 @@ function clean_var_log() {
 # Function: Create Desktop Launcher
 ########################################
 
-function create_launcher() {
+create_launcher() {
     SCRIPT_PATH="$(readlink -f "$0")"
     DESKTOP_FILE="$HOME/.local/share/applications/conky-cybersecurity-monitor.desktop"
     mkdir -p "$HOME/.local/share/applications"
@@ -322,7 +328,7 @@ EOF
 ########################################
 # Dependency Check Function (CORREGIDA)
 ########################################
-function check_dependencies() {
+check_dependencies() {
     declare -A required_commands=(
         ["dialog"]="dialog"
         ["conky"]="conky"
@@ -371,7 +377,7 @@ function check_dependencies() {
 # Main Action Functions
 ########################################
 
-function install_conky() {
+install_conky() {
     if ! dconfirm "Proceed with Conky installation and configuration?"; then
         dmsg "Installation canceled by user."
         return
@@ -380,7 +386,10 @@ function install_conky() {
     log "Starting Conky installation..."
     check_user_systemd
     echo -e "${BLUE}Updating package lists...${NC}"
-    sudo apt update
+    if [ -z "$APT_HAS_UPDATED" ]; then
+        sudo apt update
+        APT_HAS_UPDATED=1
+    fi
 
     local APPS=("conky-all" "curl" "net-tools" "lsof" "xdg-utils" "rkhunter" "lm-sensors" "nmap" "upower")
     for pkg in "${APPS[@]}"; do
@@ -392,7 +401,6 @@ function install_conky() {
 
     echo -e "${BLUE}Adjusting permissions for RKHunter...${NC}"
     sudo chmod +r /var/log/rkhunter.log
-    sudo usermod -aG adm "$(whoami)"
 
     echo -e "${BLUE}Configuring sudoers for Conky commands...${NC}"
     setup_sudoers
@@ -449,7 +457,7 @@ conky.text = [[
 \${color white}Users: \${color cyan}\${execi 30 who | awk '{print \$1}' | sort | uniq | xargs}
 
 \${color magenta}------ Security Events ------
-\${color white}Recent Events: \${color red}\${execi 30 journalctl -n 5 -p 3 -u ssh.service --no-pager | tail -n 5}
+\${color white}Recent Events: \${color red}\${execi 30 sudo journalctl -n 5 -p 3 -u ssh.service --no-pager | tail -n 5}
 
 \${color magenta}------ Rootkit Alerts ------
 \${color white}Alerts: \${execi 600 bash -c 'if [ -f /tmp/rkhunter_warnings_prev.txt ]; then if cmp -s /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; then echo "No new alerts"; else echo "New alerts detected - check /tmp/rkhunter_warnings.txt"; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; fi; else if [ -s /tmp/rkhunter_warnings.txt ]; then echo "Alerts detected - check /tmp/rkhunter_warnings.txt"; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; else echo "No alerts"; fi; fi'}
@@ -484,7 +492,7 @@ EOL
     install_rkhunter_service
 }
 
-function uninstall_conky() {
+uninstall_conky() {
     if dconfirm "Are you sure you want to completely remove Conky and all its processes?"; then
         echo -e "${RED}Stopping Conky service and related processes...${NC}"
         if [ -f ~/.config/systemd/user/conky.service ]; then
@@ -511,7 +519,7 @@ function uninstall_conky() {
     fi
 }
 
-function start_conky() {
+start_conky() {
     echo -e "${GREEN}Starting Conky service (user-level)...${NC}"
     if [ -f ~/.config/systemd/user/conky.service ]; then
         systemctl --user start conky.service
@@ -522,7 +530,7 @@ function start_conky() {
     fi
 }
 
-function stop_conky() {
+stop_conky() {
     echo -e "${GREEN}Stopping Conky service (user-level)...${NC}"
     if [ -f ~/.config/systemd/user/conky.service ]; then
         systemctl --user stop conky.service
@@ -533,7 +541,7 @@ function stop_conky() {
     fi
 }
 
-function restart_conky() {
+restart_conky() {
     echo -e "${GREEN}Restarting Conky service (user-level)...${NC}"
     if [ -f ~/.config/systemd/user/conky.service ]; then
         systemctl --user restart conky.service
@@ -544,7 +552,7 @@ function restart_conky() {
     fi
 }
 
-function check_rkhunter() {
+check_rkhunter() {
     echo -e "${BLUE}Running RKHunter scan...${NC}"
     local WARN_LOG="/tmp/rkhunter_warnings.txt"
     local TEMP_RESULT
@@ -564,10 +572,13 @@ function check_rkhunter() {
     fi
 }
 
-function restore_system() {
+restore_system() {
     if dconfirm "Restore essential system packages?"; then
         echo -e "${BLUE}Restoring essential system packages...${NC}"
-        sudo apt update
+        if [ -z "$APT_HAS_UPDATED" ]; then
+            sudo apt update
+            APT_HAS_UPDATED=1
+        fi
         local ESSENTIAL_PACKAGES=("ubuntu-desktop" "gdm3" "nautilus" "gvfs" "gvfs-backends" "gvfs-daemons" "gvfs-common" "ubuntu-standard" "ubuntu-minimal" "dbus-x11" "network-manager")
         local note
         for pkg in "${ESSENTIAL_PACKAGES[@]}"; do
@@ -608,10 +619,13 @@ function restore_system() {
         else
             echo -e "${YELLOW}Skipping broken install fixes.${NC}"
         fi
-        if ! dpkg -l | grep -qw google-chrome-stable; then
+        if ! dpkg -s google-chrome-stable &>/dev/null; then
             if dconfirm "Google Chrome is not installed. Do you want to install it?"; then
-                wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome-stable_current_amd64.deb
-                sudo dpkg -i /tmp/google-chrome-stable_current_amd64.deb || sudo apt -f install -y
+                local tmp_dir
+                tmp_dir=$(mktemp -d)
+                wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O "$tmp_dir/google-chrome-stable_current_amd64.deb"
+                sudo dpkg -i "$tmp_dir/google-chrome-stable_current_amd64.deb" || sudo apt -f install -y
+                rm -rf "$tmp_dir"
             else
                 echo -e "${YELLOW}Skipping Google Chrome installation.${NC}"
             fi
@@ -632,56 +646,58 @@ function restore_system() {
 # Main Menu (GUI with dialog)
 ########################################
 
-# Perform initial dependency check
-check_dependencies
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Perform initial dependency check
+    check_dependencies
 
-# Welcome banner
-dialog --clear --title "Welcome to Conky Cybersecurity Monitor" --msgbox "This application installs, configures, and manages Conky together with security tools like RKHunter and a temperature monitor. It also sets up a desktop launcher and offers options to view logs, remove temporary files, install pentesting tools, and clean system logs.\n\nDeveloped by jose-litium 2025\nGitHub: https://github.com/jose-litium\nLinkedIn: https://www.linkedin.com/in/josemmanueldiaz/" 15 70
+    # Welcome banner
+    dialog --clear --title "Welcome to Conky Cybersecurity Monitor" --msgbox "This application installs, configures, and manages Conky together with security tools like RKHunter and a temperature monitor. It also sets up a desktop launcher and offers options to view logs, remove temporary files, install pentesting tools, and clean system logs.\n\nDeveloped by jose-litium 2025\nGitHub: https://github.com/jose-litium\nLinkedIn: https://www.linkedin.com/in/josemmanueldiaz/" 15 70
 
-while true; do
-    choice=$(dialog --clear --backtitle "Conky Cybersecurity Monitor" \
-        --title "Main Menu" \
-        --menu "Choose an option:" 28 70 17 \
-        1 "Install Conky" \
-        2 "Uninstall Conky" \
-        3 "Start Conky" \
-        4 "Stop Conky" \
-        5 "Restart Conky" \
-        6 "Run RKHunter Scan (Manual)" \
-        7 "Restore Essential System Packages" \
-        8 "Install Automatic RKHunter Service" \
-        9 "Remove Automatic RKHunter Service" \
-        10 "Create Desktop Launcher" \
-        11 "View Application Logs" \
-        12 "View RKHunter Warnings" \
-        13 "Delete Temporary Files" \
-        14 "Clear Logs" \
-        15 "Install Pentesting Tools" \
-        16 "Clean /var/log" \
-        17 "Exit" 2>&1 >/dev/tty)
-    
-    case "$choice" in
-        1) install_conky ;;
-        2) uninstall_conky ;;
-        3) start_conky ;;
-        4) stop_conky ;;
-        5) restart_conky ;;
-        6) check_rkhunter ;;
-        7) restore_system ;;
-        8) install_rkhunter_service ;;
-        9) remove_rkhunter_service ;;
-        10) create_launcher ;;
-        11) view_logs ;;
-        12) view_rkhunter_warnings ;;
-        13) delete_temporaries ;;
-        14) clear_logs ;;
-        15) install_pentest_tools ;;
-        16) clean_var_log ;;
-        17)
-            dialog --clear --msgbox "Goodbye, and thank you for using the application!\n\njose-litium 2025\nGitHub: https://github.com/jose-litium\nLinkedIn: https://www.linkedin.com/in/josemmanueldiaz/" 10 70
-            clear
-            exit 0
-            ;;
-        *) dialog --clear --msgbox "Invalid option. Please try again." 7 60 ;;
-    esac
-done
+    while true; do
+        choice=$(dialog --clear --backtitle "Conky Cybersecurity Monitor" \
+            --title "Main Menu" \
+            --menu "Choose an option:" 28 70 17 \
+            1 "Install Conky" \
+            2 "Uninstall Conky" \
+            3 "Start Conky" \
+            4 "Stop Conky" \
+            5 "Restart Conky" \
+            6 "Run RKHunter Scan (Manual)" \
+            7 "Restore Essential System Packages" \
+            8 "Install Automatic RKHunter Service" \
+            9 "Remove Automatic RKHunter Service" \
+            10 "Create Desktop Launcher" \
+            11 "View Application Logs" \
+            12 "View RKHunter Warnings" \
+            13 "Delete Temporary Files" \
+            14 "Clear Logs" \
+            15 "Install Pentesting Tools" \
+            16 "Clean /var/log" \
+            17 "Exit" 2>&1 >/dev/tty)
+
+        case "$choice" in
+            1) install_conky ;;
+            2) uninstall_conky ;;
+            3) start_conky ;;
+            4) stop_conky ;;
+            5) restart_conky ;;
+            6) check_rkhunter ;;
+            7) restore_system ;;
+            8) install_rkhunter_service ;;
+            9) remove_rkhunter_service ;;
+            10) create_launcher ;;
+            11) view_logs ;;
+            12) view_rkhunter_warnings ;;
+            13) delete_temporaries ;;
+            14) clear_logs ;;
+            15) install_pentest_tools ;;
+            16) clean_var_log ;;
+            17)
+                dialog --clear --msgbox "Goodbye, and thank you for using the application!\n\njose-litium 2025\nGitHub: https://github.com/jose-litium\nLinkedIn: https://www.linkedin.com/in/josemmanueldiaz/" 10 70
+                clear
+                exit 0
+                ;;
+            *) dialog --clear --msgbox "Invalid option. Please try again." 7 60 ;;
+        esac
+    done
+fi
