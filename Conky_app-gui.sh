@@ -625,56 +625,58 @@ function restore_system() {
 # Main Menu (GUI with dialog)
 ########################################
 
-# Perform initial dependency check
-check_dependencies
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Perform initial dependency check
+    check_dependencies
 
-# Welcome banner
-dialog --clear --title "Welcome to Conky Cybersecurity Monitor" --msgbox "This application installs, configures, and manages Conky together with security tools like RKHunter and a temperature monitor. It also sets up a desktop launcher and offers options to view logs, remove temporary files, install pentesting tools, and clean system logs.\n\nDeveloped by jose-litium 2025\nGitHub: https://github.com/jose-litium\nLinkedIn: https://www.linkedin.com/in/josemmanueldiaz/" 15 70
+    # Welcome banner
+    dialog --clear --title "Welcome to Conky Cybersecurity Monitor" --msgbox "This application installs, configures, and manages Conky together with security tools like RKHunter and a temperature monitor. It also sets up a desktop launcher and offers options to view logs, remove temporary files, install pentesting tools, and clean system logs.\n\nDeveloped by jose-litium 2025\nGitHub: https://github.com/jose-litium\nLinkedIn: https://www.linkedin.com/in/josemmanueldiaz/" 15 70
 
-while true; do
-    choice=$(dialog --clear --backtitle "Conky Cybersecurity Monitor" \
-        --title "Main Menu" \
-        --menu "Choose an option:" 28 70 17 \
-        1 "Install Conky" \
-        2 "Uninstall Conky" \
-        3 "Start Conky" \
-        4 "Stop Conky" \
-        5 "Restart Conky" \
-        6 "Run RKHunter Scan (Manual)" \
-        7 "Restore Essential System Packages" \
-        8 "Install Automatic RKHunter Service" \
-        9 "Remove Automatic RKHunter Service" \
-        10 "Create Desktop Launcher" \
-        11 "View Application Logs" \
-        12 "View RKHunter Warnings" \
-        13 "Delete Temporary Files" \
-        14 "Clear Logs" \
-        15 "Install Pentesting Tools" \
-        16 "Clean /var/log" \
-        17 "Exit" 2>&1 >/dev/tty)
-    
-    case "$choice" in
-        1) install_conky ;;
-        2) uninstall_conky ;;
-        3) start_conky ;;
-        4) stop_conky ;;
-        5) restart_conky ;;
-        6) check_rkhunter ;;
-        7) restore_system ;;
-        8) install_rkhunter_service ;;
-        9) remove_rkhunter_service ;;
-        10) create_launcher ;;
-        11) view_logs ;;
-        12) view_rkhunter_warnings ;;
-        13) delete_temporaries ;;
-        14) clear_logs ;;
-        15) install_pentest_tools ;;
-        16) clean_var_log ;;
-        17)
-            dialog --clear --msgbox "Goodbye, and thank you for using the application!\n\njose-litium 2025\nGitHub: https://github.com/jose-litium\nLinkedIn: https://www.linkedin.com/in/josemmanueldiaz/" 10 70
-            clear
-            exit 0
-            ;;
-        *) dialog --clear --msgbox "Invalid option. Please try again." 7 60 ;;
-    esac
-done
+    while true; do
+        choice=$(dialog --clear --backtitle "Conky Cybersecurity Monitor" \
+            --title "Main Menu" \
+            --menu "Choose an option:" 28 70 17 \
+            1 "Install Conky" \
+            2 "Uninstall Conky" \
+            3 "Start Conky" \
+            4 "Stop Conky" \
+            5 "Restart Conky" \
+            6 "Run RKHunter Scan (Manual)" \
+            7 "Restore Essential System Packages" \
+            8 "Install Automatic RKHunter Service" \
+            9 "Remove Automatic RKHunter Service" \
+            10 "Create Desktop Launcher" \
+            11 "View Application Logs" \
+            12 "View RKHunter Warnings" \
+            13 "Delete Temporary Files" \
+            14 "Clear Logs" \
+            15 "Install Pentesting Tools" \
+            16 "Clean /var/log" \
+            17 "Exit" 2>&1 >/dev/tty)
+
+        case "$choice" in
+            1) install_conky ;;
+            2) uninstall_conky ;;
+            3) start_conky ;;
+            4) stop_conky ;;
+            5) restart_conky ;;
+            6) check_rkhunter ;;
+            7) restore_system ;;
+            8) install_rkhunter_service ;;
+            9) remove_rkhunter_service ;;
+            10) create_launcher ;;
+            11) view_logs ;;
+            12) view_rkhunter_warnings ;;
+            13) delete_temporaries ;;
+            14) clear_logs ;;
+            15) install_pentest_tools ;;
+            16) clean_var_log ;;
+            17)
+                dialog --clear --msgbox "Goodbye, and thank you for using the application!\n\njose-litium 2025\nGitHub: https://github.com/jose-litium\nLinkedIn: https://www.linkedin.com/in/josemmanueldiaz/" 10 70
+                clear
+                exit 0
+                ;;
+            *) dialog --clear --msgbox "Invalid option. Please try again." 7 60 ;;
+        esac
+    done
+fi
