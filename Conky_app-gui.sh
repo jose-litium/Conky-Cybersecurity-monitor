@@ -281,7 +281,7 @@ function install_pentest_tools() {
 # Function: Clean /var/log
 ########################################
 
-function clean_var_log() {
+clean_var_log() {
     if dconfirm "Clean /var/log? This will vacuum journal logs to 1 day and rotate log files."; then
         sudo journalctl --vacuum-time=1d
         sudo logrotate -f /etc/logrotate.conf
