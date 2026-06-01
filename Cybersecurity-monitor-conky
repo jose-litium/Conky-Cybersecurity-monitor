@@ -32,18 +32,18 @@ mkdir -p "$INSTALL_DIR"
 # ------------------------------------------------------------------------------
 
 # Muestra un cuadro de diálogo de confirmación (Sí/No)
-function dconfirm() {
+dconfirm() {
     dialog --clear --yesno "$1" 7 60
     return $?
 }
 
 # Muestra un cuadro de mensaje
-function dmsg() {
+dmsg() {
     dialog --clear --msgbox "$1" 10 60
 }
 
 # Muestra un menú y devuelve la opción elegida
-function dmenu() {
+dmenu() {
     local menu_title="$1"
     shift
     local menu_options=("$@")
@@ -64,7 +64,7 @@ sudo -v || { dmsg "No se pudieron obtener privilegios sudo. Saliendo..."; exit 1
 # Función: check_user_systemd
 #   Verifica si hay systemd a nivel de usuario disponible.
 # ------------------------------------------------------------------------------
-function check_user_systemd() {
+check_user_systemd() {
     if ! systemctl --user 2>/dev/null; then
         dmsg "Systemd a nivel de usuario no está disponible. Utiliza un sistema con soporte (Ubuntu 18.04+)."
         exit 1
@@ -75,7 +75,7 @@ function check_user_systemd() {
 # Función: check_install
 #   Verifica si un paquete está instalado; si no, pregunta si se desea instalar.
 # ------------------------------------------------------------------------------
-function check_install() {
+check_install() {
     local pkg="$1"
     if dpkg -l | grep -qw "$pkg"; then
         echo -e "${GREEN}$pkg ya está instalado.${NC}"
@@ -93,7 +93,7 @@ function check_install() {
 # Función: create_rkhunter_scan_script
 #   Crea un script auxiliar para escanear con RKHunter cada vez que se inicia Conky.
 # ------------------------------------------------------------------------------
-function create_rkhunter_scan_script() {
+create_rkhunter_scan_script() {
     local SCRIPT="$INSTALL_DIR/rkhunter_scan.sh"
     cat <<'EOF' > "$SCRIPT"
 #!/usr/bin/env bash
@@ -109,7 +109,7 @@ EOF
 # Función: configure_sensors
 #   Ejecuta sensors-detect para configurar lm-sensors automáticamente.
 # ------------------------------------------------------------------------------
-function configure_sensors() {
+configure_sensors() {
     echo -e "${BLUE}Configurando sensores de hardware (lm-sensors)...${NC}"
     if command -v sensors &> /dev/null; then
          if dconfirm "¿Deseas ejecutar sensors-detect para configurar tus sensores automáticamente?"; then
@@ -128,7 +128,7 @@ function configure_sensors() {
 # Función: create_temp_monitor_script
 #   Crea un script auxiliar que se ejecuta en segundo plano para monitorear la temperatura de la CPU.
 # ------------------------------------------------------------------------------
-function create_temp_monitor_script() {
+create_temp_monitor_script() {
     local SCRIPT="$INSTALL_DIR/temp_monitor.sh"
     cat <<'EOF' > "$SCRIPT"
 #!/usr/bin/env bash
@@ -145,7 +145,7 @@ EOF
 # Función: install_temp_monitor_service
 #   Instala un servicio systemd a nivel de usuario para el monitor de temperatura.
 # ------------------------------------------------------------------------------
-function install_temp_monitor_service() {
+install_temp_monitor_service() {
     mkdir -p ~/.config/systemd/user
     cat <<EOL > ~/.config/systemd/user/temp_monitor.service
 [Unit]
@@ -169,7 +169,7 @@ EOL
 # Función: install_rkhunter_service
 #   Instala un servicio y temporizador systemd a nivel de sistema para ejecutar RKHunter automáticamente.
 # ------------------------------------------------------------------------------
-function install_rkhunter_service() {
+install_rkhunter_service() {
     echo -e "${BLUE}Instalando servicio automático de escaneo con RKHunter...${NC}"
     sudo tee /etc/systemd/system/rkhunter-auto.service > /dev/null <<EOL
 [Unit]
@@ -204,7 +204,7 @@ EOL
 # Función: remove_rkhunter_service
 #   Elimina el servicio y temporizador automático de RKHunter.
 # ------------------------------------------------------------------------------
-function remove_rkhunter_service() {
+remove_rkhunter_service() {
     echo -e "${RED}Eliminando servicio y temporizador automático de RKHunter...${NC}"
     sudo systemctl disable rkhunter-auto.timer
     sudo systemctl stop rkhunter-auto.timer
@@ -220,7 +220,7 @@ function remove_rkhunter_service() {
 #   Instala conky-all y sus dependencias, configura RKHunter,
 #   crea un servicio systemd a nivel de usuario para Conky y lo inicia.
 # ------------------------------------------------------------------------------
-function install_conky() {
+install_conky() {
     if ! dconfirm "¿Proceder con la instalación y configuración de Conky?"; then
         dmsg "Instalación abortada por el usuario."
         return
@@ -350,7 +350,7 @@ EOL
 # Función: uninstall_conky
 #   Detiene y elimina conky-all (y procesos de Conky) junto con su configuración.
 # ------------------------------------------------------------------------------
-function uninstall_conky() {
+uninstall_conky() {
     if dconfirm "¿Estás seguro de que deseas eliminar completamente Conky y todos sus procesos?"; then
         echo -e "${RED}Deteniendo el servicio de Conky y todos los procesos...${NC}"
         if [ -f ~/.config/systemd/user/conky.service ]; then
@@ -383,7 +383,7 @@ function uninstall_conky() {
 # Función: start_conky
 #   Inicia el servicio de Conky a nivel de usuario.
 # ------------------------------------------------------------------------------
-function start_conky() {
+start_conky() {
     echo -e "${GREEN}Iniciando servicio de Conky (usuario)...${NC}"
     if [ -f ~/.config/systemd/user/conky.service ]; then
         systemctl --user start conky.service
@@ -398,7 +398,7 @@ function start_conky() {
 # Función: stop_conky
 #   Detiene el servicio de Conky a nivel de usuario.
 # ------------------------------------------------------------------------------
-function stop_conky() {
+stop_conky() {
     echo -e "${GREEN}Deteniendo servicio de Conky (usuario)...${NC}"
     if [ -f ~/.config/systemd/user/conky.service ]; then
         systemctl --user stop conky.service
@@ -413,7 +413,7 @@ function stop_conky() {
 # Función: restart_conky
 #   Reinicia el servicio de Conky a nivel de usuario.
 # ------------------------------------------------------------------------------
-function restart_conky() {
+restart_conky() {
     echo -e "${GREEN}Reiniciando servicio de Conky (usuario)...${NC}"
     if [ -f ~/.config/systemd/user/conky.service ]; then
         systemctl --user restart conky.service
@@ -428,7 +428,7 @@ function restart_conky() {
 # Función: check_rkhunter
 #   Ejecuta un escaneo automático con RKHunter y muestra alertas si existen.
 # ------------------------------------------------------------------------------
-function check_rkhunter() {
+check_rkhunter() {
     echo -e "${BLUE}Ejecutando escaneo con RKHunter...${NC}"
     local WARN_LOG="/tmp/rkhunter_warnings.txt"
     sudo rkhunter --update > /dev/null 2>&1
@@ -449,7 +449,7 @@ function check_rkhunter() {
 # Función: restore_system
 #   Reinstala paquetes esenciales del sistema que podrían haber sido removidos.
 # ------------------------------------------------------------------------------
-function restore_system() {
+restore_system() {
     echo -e "${BLUE}Restaurando paquetes esenciales del sistema...${NC}"
     sudo apt update
 
@@ -519,7 +519,7 @@ function restore_system() {
 # Función: main_menu
 #   Muestra un menú numérico y llama a las funciones correspondientes.
 # ------------------------------------------------------------------------------
-function main_menu() {
+main_menu() {
     while true; do
         # Mostrar banner ASCII
         local banner="  ____                _           
