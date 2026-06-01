@@ -34,23 +34,23 @@ NC='\033[0m'
 ########################################
 
 # Check if a command is installed
-function is_command_installed() {
+is_command_installed() {
     command -v "$1" &>/dev/null
 }
 
 # Confirmation dialog
-function dconfirm() {
+dconfirm() {
     dialog --clear --yesno "$1" 7 60
     return $?
 }
 
 # Message dialog
-function dmsg() {
+dmsg() {
     dialog --clear --msgbox "$1" 10 60
 }
 
 # Menu dialog (returns the chosen option)
-function dmenu() {
+dmenu() {
     local title="$1"
     shift
     local options=("$@")
@@ -65,7 +65,7 @@ function dmenu() {
 # Sudoers Configuration
 ########################################
 
-function setup_sudoers() {
+setup_sudoers() {
     echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat, /usr/bin/sensors, /usr/bin/journalctl, /usr/bin/curl, /usr/bin/hostname -I, /usr/bin/rkhunter" | sudo tee /etc/sudoers.d/conky > /dev/null
     sudo chmod 0440 /etc/sudoers.d/conky
     log "Sudoers updated for user $USER."
@@ -75,15 +75,15 @@ function setup_sudoers() {
 # Logging Functions
 ########################################
 
-function log() {
+log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOGFILE"
 }
 
-function clear_log_file() {
+clear_log_file() {
     > "$LOGFILE"
 }
 
-function run_cmd() {
+run_cmd() {
     log "Running: $*"
     "$@" >> "$LOGFILE" 2>&1
 }
@@ -92,14 +92,14 @@ function run_cmd() {
 # Internal Checks
 ########################################
 
-function check_user_systemd() {
+check_user_systemd() {
     if ! systemctl --user 2>/dev/null; then
         dmsg "User-level systemd is not available.\nPlease use a version of Ubuntu/Debian with a desktop environment (18.04+)."
         exit 1
     fi
 }
 
-function check_install() {
+check_install() {
     local pkg="$1"
     if dpkg -l | grep -qw "$pkg"; then
         log "$pkg is already installed."
@@ -114,7 +114,7 @@ function check_install() {
     fi
 }
 
-function configure_sensors() {
+configure_sensors() {
     echo -e "${BLUE}Configuring hardware sensors (lm-sensors)...${NC}"
     if command -v sensors &>/dev/null; then
             if dconfirm "Do you want to run sensors-detect to automatically configure your sensors?"; then
@@ -129,7 +129,7 @@ function configure_sensors() {
     fi
 }
 
-function create_rkhunter_scan_script() {
+create_rkhunter_scan_script() {
     local SCRIPT="$INSTALL_DIR/rkhunter_scan.sh"
     cat <<'EOF' > "$SCRIPT"
 #!/usr/bin/env bash
@@ -143,7 +143,7 @@ EOF
     log "RKHunter scan script created at $SCRIPT."
 }
 
-function create_temp_monitor_script() {
+create_temp_monitor_script() {
     local SCRIPT="$INSTALL_DIR/temp_monitor.sh"
     cat <<'EOF' > "$SCRIPT"
 #!/usr/bin/env bash
@@ -163,7 +163,7 @@ EOF
     log "Temperature monitor script created at $SCRIPT."
 }
 
-function install_temp_monitor_service() {
+install_temp_monitor_service() {
     mkdir -p ~/.config/systemd/user
     cat <<EOL > ~/.config/systemd/user/temp_monitor.service
 [Unit]
@@ -184,7 +184,7 @@ EOL
     log "Temperature monitor service installed and started."
 }
 
-function install_rkhunter_service() {
+install_rkhunter_service() {
     echo -e "${BLUE}Installing automatic RKHunter scan service...${NC}"
     sudo tee /etc/systemd/system/rkhunter-auto.service > /dev/null <<EOL
 [Unit]
@@ -216,7 +216,7 @@ EOL
     log "RKHunter service and timer installed."
 }
 
-function remove_rkhunter_service() {
+remove_rkhunter_service() {
     echo -e "${RED}Removing automatic RKHunter scan service and timer...${NC}"
     sudo systemctl disable rkhunter-auto.timer
     sudo systemctl stop rkhunter-auto.timer
@@ -231,19 +231,19 @@ function remove_rkhunter_service() {
 # Functions: Delete Logs and Temporary Files
 ########################################
 
-function delete_temporaries() {
+delete_temporaries() {
     rm -f /tmp/rkhunter_result.txt /tmp/rkhunter_warnings.txt /tmp/cpu_temp.txt
     dmsg "Temporary files deleted."
     log "Temporary files deleted."
 }
 
-function clear_logs() {
+clear_logs() {
     clear_log_file
     dmsg "Log file cleared."
     log "Log file cleared."
 }
 
-function view_logs() {
+view_logs() {
     if [ -f "$LOGFILE" ]; then
         dialog --textbox "$LOGFILE" 20 70
     else
@@ -251,7 +251,7 @@ function view_logs() {
     fi
 }
 
-function view_rkhunter_warnings() {
+view_rkhunter_warnings() {
     local WARN_LOG="/tmp/rkhunter_warnings.txt"
     if [ -f "$WARN_LOG" ]; then
         dialog --textbox "$WARN_LOG" 20 70
@@ -264,7 +264,7 @@ function view_rkhunter_warnings() {
 # Function: Install Pentesting Tools
 ########################################
 
-function install_pentest_tools() {
+install_pentest_tools() {
     if dconfirm "Install pentesting tools? (Already-installed tools will be skipped)"; then
         local TOOLS=("nmap" "sqlmap" "aircrack-ng" "hydra" "john" "metasploit-framework" "wireshark")
         for tool in "${TOOLS[@]}"; do
@@ -281,7 +281,7 @@ function install_pentest_tools() {
 # Function: Clean /var/log
 ########################################
 
-function clean_var_log() {
+clean_var_log() {
     if dconfirm "Clean /var/log? This will vacuum journal logs to 1 day and truncate log files."; then
         sudo journalctl --vacuum-time=1d
         sudo find /var/log -type f -exec truncate -s 0 {} \;
@@ -296,7 +296,7 @@ function clean_var_log() {
 # Function: Create Desktop Launcher
 ########################################
 
-function create_launcher() {
+create_launcher() {
     SCRIPT_PATH="$(readlink -f "$0")"
     DESKTOP_FILE="$HOME/.local/share/applications/conky-cybersecurity-monitor.desktop"
     mkdir -p "$HOME/.local/share/applications"
@@ -318,7 +318,7 @@ EOF
 ########################################
 # Dependency Check Function (CORREGIDA)
 ########################################
-function check_dependencies() {
+check_dependencies() {
     declare -A required_commands=(
         ["dialog"]="dialog"
         ["conky"]="conky"
@@ -367,7 +367,7 @@ function check_dependencies() {
 # Main Action Functions
 ########################################
 
-function install_conky() {
+install_conky() {
     if ! dconfirm "Proceed with Conky installation and configuration?"; then
         dmsg "Installation canceled by user."
         return
@@ -480,7 +480,7 @@ EOL
     install_rkhunter_service
 }
 
-function uninstall_conky() {
+uninstall_conky() {
     if dconfirm "Are you sure you want to completely remove Conky and all its processes?"; then
         echo -e "${RED}Stopping Conky service and related processes...${NC}"
         if [ -f ~/.config/systemd/user/conky.service ]; then
@@ -507,7 +507,7 @@ function uninstall_conky() {
     fi
 }
 
-function start_conky() {
+start_conky() {
     echo -e "${GREEN}Starting Conky service (user-level)...${NC}"
     if [ -f ~/.config/systemd/user/conky.service ]; then
         systemctl --user start conky.service
@@ -518,7 +518,7 @@ function start_conky() {
     fi
 }
 
-function stop_conky() {
+stop_conky() {
     echo -e "${GREEN}Stopping Conky service (user-level)...${NC}"
     if [ -f ~/.config/systemd/user/conky.service ]; then
         systemctl --user stop conky.service
@@ -529,7 +529,7 @@ function stop_conky() {
     fi
 }
 
-function restart_conky() {
+restart_conky() {
     echo -e "${GREEN}Restarting Conky service (user-level)...${NC}"
     if [ -f ~/.config/systemd/user/conky.service ]; then
         systemctl --user restart conky.service
@@ -540,7 +540,7 @@ function restart_conky() {
     fi
 }
 
-function check_rkhunter() {
+check_rkhunter() {
     echo -e "${BLUE}Running RKHunter scan...${NC}"
     local WARN_LOG="/tmp/rkhunter_warnings.txt"
     sudo rkhunter --update > /dev/null 2>&1
@@ -557,7 +557,7 @@ function check_rkhunter() {
     fi
 }
 
-function restore_system() {
+restore_system() {
     if dconfirm "Restore essential system packages?"; then
         echo -e "${BLUE}Restoring essential system packages...${NC}"
         sudo apt update
