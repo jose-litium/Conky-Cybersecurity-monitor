@@ -397,7 +397,6 @@ install_conky() {
 
     echo -e "${BLUE}Adjusting permissions for RKHunter...${NC}"
     sudo chmod +r /var/log/rkhunter.log
-    sudo usermod -aG adm "$(whoami)"
 
     echo -e "${BLUE}Configuring sudoers for Conky commands...${NC}"
     setup_sudoers
@@ -454,7 +453,7 @@ conky.text = [[
 \${color white}Users: \${color cyan}\${execi 30 who | awk '{print \$1}' | sort | uniq | xargs}
 
 \${color magenta}------ Security Events ------
-\${color white}Recent Events: \${color red}\${execi 30 journalctl -n 5 -p 3 -u ssh.service --no-pager | tail -n 5}
+\${color white}Recent Events: \${color red}\${execi 30 sudo journalctl -n 5 -p 3 -u ssh.service --no-pager | tail -n 5}
 
 \${color magenta}------ Rootkit Alerts ------
 \${color white}Alerts: \${execi 600 bash -c 'if [ -f /tmp/rkhunter_warnings_prev.txt ]; then if cmp -s /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; then echo "No new alerts"; else echo "New alerts detected - check /tmp/rkhunter_warnings.txt"; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; fi; else if [ -s /tmp/rkhunter_warnings.txt ]; then echo "Alerts detected - check /tmp/rkhunter_warnings.txt"; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; else echo "No alerts"; fi; fi'}
