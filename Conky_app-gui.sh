@@ -104,7 +104,7 @@ check_user_systemd() {
 
 check_install() {
     local pkg="$1"
-    if dpkg -l | grep -qw "$pkg"; then
+    if dpkg -s "$pkg" &>/dev/null; then
         log "$pkg is already installed."
     else
         log "$pkg is not installed."
@@ -612,7 +612,7 @@ restore_system() {
         else
             echo -e "${YELLOW}Skipping broken install fixes.${NC}"
         fi
-        if ! dpkg -l | grep -qw google-chrome-stable; then
+        if ! dpkg -s google-chrome-stable &>/dev/null; then
             if dconfirm "Google Chrome is not installed. Do you want to install it?"; then
                 local tmp_dir
                 tmp_dir=$(mktemp -d)
