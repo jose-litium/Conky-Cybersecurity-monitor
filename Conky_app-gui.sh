@@ -83,11 +83,6 @@ function clear_log_file() {
     > "$LOGFILE"
 }
 
-function run_cmd() {
-    log "Running: $*"
-    "$@" >> "$LOGFILE" 2>&1
-}
-
 ########################################
 # Internal Checks
 ########################################
