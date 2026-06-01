@@ -77,7 +77,7 @@ function check_user_systemd() {
 # ------------------------------------------------------------------------------
 function check_install() {
     local pkg="$1"
-    if dpkg -l | grep -qw "$pkg"; then
+    if dpkg -s "$pkg" &>/dev/null; then
         echo -e "${GREEN}$pkg ya está instalado.${NC}"
     else
         echo -e "${CYAN}$pkg no está instalado.${NC}"
@@ -497,7 +497,7 @@ function restore_system() {
          echo -e "${YELLOW}Saltando corrección de dependencias.${NC}"
     fi
 
-    if ! dpkg -l | grep -qw google-chrome-stable; then
+    if ! dpkg -s google-chrome-stable &>/dev/null; then
          if dconfirm "Google Chrome no está instalado. ¿Deseas instalarlo?"; then
              wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome-stable_current_amd64.deb
              sudo dpkg -i /tmp/google-chrome-stable_current_amd64.deb || sudo apt -f install -y
