@@ -1,0 +1,106 @@
+### Required Conflict Audit
+
+**File path:** `Conky_app-gui.sh`
+**Number of conflict regions:** 2
+
+**Conflict touches:**
+- sudoers generation: No
+- rkhunter paths: Yes (cleanup logic)
+- cpu_temp handling: Yes (path handling in cleanup)
+- mktemp usage: No
+- cleanup/delete_temporaries: Yes
+- systemd service generation: No
+- Conky config: No
+- tests: No
+
+#### Conflict Block 1 (cleanup function)
+
+BASE:
+```bash
+    # Secure removal of sensitive temp files
+    rm -f /tmp/rkhunter_result.* /tmp/rkhunter_warnings*.txt /tmp/cpu_temp.txt 2>/dev/null || true
+```
+
+OURS (Stashed changes - The Security Fix):
+```bash
+    # Secure removal of sensitive temp files
+    sudo rm -f /var/log/rkhunter_result.* /var/log/rkhunter_warnings*.txt /tmp/cpu_temp.txt /var/log/rkhunter_status.txt 2>/dev/null || true
+```
+
+THEIRS (Updated upstream - The upstream cpu_temp fix):
+```bash
+    # Secure removal of sensitive temp files
+    rm -f /tmp/rkhunter_result.* /tmp/rkhunter_warnings*.txt "$INSTALL_DIR/cpu_temp.txt" 2>/dev/null || true
+```
+
+PROPOSED RESOLUTION:
+```bash
+    # Secure removal of sensitive temp files
+    sudo rm -f /var/log/rkhunter_result.* /var/log/rkhunter_warnings*.txt "$INSTALL_DIR/cpu_temp.txt" /var/log/rkhunter_status.txt 2>/dev/null || true
+```
+
+SECURITY JUSTIFICATION:
+- **Least privilege is preserved**: Uses `sudo rm` only for the `/var/log` secure paths, ensuring cleanup can execute even if log rotation occurred or permissions were restrictive.
+- **Predictable temporary files are not reintroduced**: It preserves the change of rkhunter logs to `/var/log` and the upstream change of moving `cpu_temp.txt` to `$INSTALL_DIR`.
+- **Dashboard functionality is preserved**: Cleanups do not affect runtime.
+- **No privilege escalation path is added**: Deleting these specific files with wildcards under `/var/log` and `$INSTALL_DIR` ensures we don't open up arbitrary removal inside `/tmp`.
+
+---
+
+#### Conflict Block 2 (delete_temporaries function)
+
+BASE:
+```bash
+    local -a temp_files=(
+        "/tmp/rkhunter_result.txt"
+        "/tmp/rkhunter_warnings.txt"
+        "/tmp/rkhunter_warnings_prev.txt"
+        "/tmp/rkhunter_status.txt"
+        "/tmp/cpu_temp.txt"
+        "/tmp/rkhunter_result."*
+        "/tmp/cpu_temp_"*".txt"
+        "/tmp/rkhunter_warnings_"*".txt"
+    )
+```
+
+OURS (Stashed changes - The Security Fix):
+```bash
+    local -a temp_files=(
+        "/var/log/rkhunter_result.txt"
+        "/var/log/rkhunter_warnings.txt"
+        "/var/log/rkhunter_warnings_prev.txt"
+        "/var/log/rkhunter_status.txt"
+        "/tmp/cpu_temp.txt"
+        "/tmp/cpu_temp_"*".txt"
+    )
+```
+
+THEIRS (Updated upstream - The upstream cpu_temp fix):
+```bash
+    local -a temp_files=(
+        "/tmp/rkhunter_result.txt"
+        "/tmp/rkhunter_warnings.txt"
+        "/tmp/rkhunter_warnings_prev.txt"
+        "/tmp/rkhunter_status.txt"
+        "$INSTALL_DIR/cpu_temp.txt"
+        "/tmp/rkhunter_result."*
+        "/tmp/rkhunter_warnings_"*".txt"
+    )
+```
+
+PROPOSED RESOLUTION:
+```bash
+    local -a temp_files=(
+        "/var/log/rkhunter_result.txt"
+        "/var/log/rkhunter_warnings.txt"
+        "/var/log/rkhunter_warnings_prev.txt"
+        "/var/log/rkhunter_status.txt"
+        "$INSTALL_DIR/cpu_temp.txt"
+    )
+```
+
+SECURITY JUSTIFICATION:
+- **Least privilege is preserved**: The array explicitly targets only required files. (A loop handles the `sudo rm`).
+- **Predictable temporary files are not reintroduced**: Preserves the security fix moving `/tmp/rkhunter_*` to `/var/log/` and also correctly merges the upstream fix moving `/tmp/cpu_temp.txt` to `$INSTALL_DIR`.
+- **Dashboard functionality is preserved**: Proper cleanup runs on the correct paths.
+- **No privilege escalation path is added**: Array items are bounded.

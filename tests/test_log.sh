@@ -5,6 +5,7 @@ set -e
 
 # Create a clean version of the script that we can source without running the UI
 cp Conky_app-gui.sh /tmp/Conky_app-gui-test.sh
+sed -i "s/^readonly LOGFILE/LOGFILE/" /tmp/Conky_app-gui-test.sh
 sed -i '/^# Main Menu (GUI with dialog)/,$d' /tmp/Conky_app-gui-test.sh
 
 # Source the functions
@@ -55,6 +56,17 @@ if [ -f "$LOGFILE" ] && [ ! -s "$LOGFILE" ]; then
     echo "✅ PASS: clear_log_file clears an existing file."
 else
     echo "❌ FAIL: clear_log_file did not clear the file."
+    FAIL=1
+fi
+
+# Test 5: run_cmd logs command and output
+clear_log_file
+run_cmd echo "Hello, Run Cmd"
+if grep -q "Running: echo Hello, Run Cmd" "$LOGFILE" && grep -q "Hello, Run Cmd" "$LOGFILE"; then
+    echo "✅ PASS: run_cmd logs the command and its output."
+else
+    echo "❌ FAIL: run_cmd did not log the command or output correctly."
+    cat "$LOGFILE"
     FAIL=1
 fi
 

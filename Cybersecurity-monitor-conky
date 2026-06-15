@@ -137,7 +137,7 @@ create_temp_monitor_script() {
 #!/usr/bin/env bash
 while true; do
     temp=$(sensors | grep -Eo '\+[0-9]+(\.[0-9]+)?°C' | head -n1)
-    echo "${temp:-N/A}" > /tmp/cpu_temp.txt
+    echo "${temp:-N/A}" > "$INSTALL_DIR/cpu_temp.txt"
     sleep 10
 done
 EOF
@@ -249,7 +249,7 @@ install_conky() {
     sudo usermod -aG adm "$(whoami)"
 
     echo -e "${BLUE}Configurando sudoers para comandos de Conky...${NC}"
-    echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat, /usr/bin/sensors, /usr/bin/journalctl, /usr/bin/curl, /usr/bin/hostname -I, /usr/bin/rkhunter" \
+    echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/rkhunter --update, /usr/bin/rkhunter --propupd, /usr/bin/rkhunter --check --sk" \
          | sudo tee /etc/sudoers.d/conky > /dev/null
     sudo chmod 0440 /etc/sudoers.d/conky
 
@@ -291,7 +291,7 @@ conky.text = [[
 \${color white}CPU: \${if_match \${cpu cpu0} > 80}\${color red}\${cpu cpu0}%\${else}\${color green}\${cpu cpu0}%\${endif} \${cpubar cpu0 10,}
 \${color white}RAM: \${if_match \${memperc} > 40}\${color red}\${memperc}%\${else}\${color green}\${memperc}%\${endif} \${membar 10}
 \${color white}Main HDD: \${if_match \${fs_used_perc /} > 60}\${color red}\${fs_used_perc /}%\${else}\${color green}\${fs_used_perc /}%\${endif} \${fs_bar /}
-\${color white}Temp. CPU: \${color red}\${execi 10 cat /tmp/cpu_temp.txt || echo "N/A"}
+\${color white}Temp. CPU: \${color red}\${execi 10 cat /home/${USERNAME}/.local/conky_app/cpu_temp.txt 2>/dev/null || echo "N/A"}
 \${color white}Uptime: \${color green}\${uptime}
 
 \${color magenta}------ Información de Red ------
