@@ -6,7 +6,7 @@
 source ./Conky_app-gui.sh
 
 # Override LOGFILE to a dummy file for testing
-export LOGFILE="/tmp/test_conky_gui.log"
+LOGFILE="/tmp/test_conky_gui.log"
 
 # Create some dummy content
 echo "dummy log entry 1" > "$LOGFILE"
