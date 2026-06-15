@@ -477,15 +477,38 @@ install_pentest_tools() {
     if dconfirm "Install pentesting tools? (Already-installed tools will be skipped)"; then
         local -a tools=("nmap" "sqlmap" "aircrack-ng" "hydra" "john" "metasploit-framework" "wireshark")
         local installed=0 failed=0
+        local to_install=()
         
         for tool in "${tools[@]}"; do
-            if check_install "$tool"; then
+            if dpkg-query -W -f='${Status}' "$tool" 2>/dev/null | grep -q " ok installed"; then
+                log "$tool is already installed."
                 ((installed++)) || true
             else
-                ((failed++)) || true
+                log "$tool is not installed."
+                if dconfirm "Do you want to install $tool?"; then
+                    to_install+=("$tool")
+                else
+                    log "Installation of $tool canceled by user."
+                    ((failed++)) || true
+                fi
             fi
         done
         
+        if [[ ${#to_install[@]} -gt 0 ]]; then
+            if [[ -z "${APT_HAS_UPDATED:-}" ]]; then
+                sudo apt update
+                APT_HAS_UPDATED=1
+            fi
+            if sudo apt install -y "${to_install[@]}"; then
+                log "Successfully installed: ${to_install[*]}"
+                ((installed+=${#to_install[@]})) || true
+            else
+                log "ERROR: Failed to install some or all tools: ${to_install[*]}"
+                dmsg "Failed to install tools. This may affect functionality."
+                ((failed+=${#to_install[@]})) || true
+            fi
+        fi
+
         dmsg "Pentesting tools installation complete.\nInstalled: $installed | Failed/Skipped: $failed"
         log "Pentesting tools batch complete: $installed installed, $failed failed/skipped"
     else
