@@ -248,7 +248,7 @@ install_conky() {
     sudo usermod -aG adm "$(whoami)"
 
     echo -e "${BLUE}Configurando sudoers para comandos de Conky...${NC}"
-    echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/netstat, /usr/bin/lsof, /usr/bin/grep, /usr/bin/cat, /usr/bin/sensors, /usr/bin/journalctl, /usr/bin/curl, /usr/bin/hostname -I, /usr/bin/rkhunter" \
+    echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/sensors, /usr/bin/rkhunter --update, /usr/bin/rkhunter --propupd, /usr/bin/rkhunter --check --sk" \
          | sudo tee /etc/sudoers.d/conky > /dev/null
     sudo chmod 0440 /etc/sudoers.d/conky
 
