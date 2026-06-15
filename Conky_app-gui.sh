@@ -155,29 +155,39 @@ check_user_systemd() {
 }
 
 check_install() {
-    local pkg="$1"
-    if dpkg -s "$pkg" &>/dev/null; then
-        log "$pkg is already installed."
-        return 0
-    else
-        log "$pkg is not installed."
-        if dconfirm "Do you want to install $pkg?"; then
-            if [[ -z "$APT_HAS_UPDATED" ]]; then
-                sudo apt update
-                APT_HAS_UPDATED=1
-            fi
-            if sudo apt install -y "$pkg"; then
-                log "$pkg installed successfully."
-                return 0
-            else
-                log "ERROR: Failed to install $pkg"
-                dmsg "Failed to install $pkg. This may affect functionality."
-                return 1
-            fi
+    local pkgs=("$@")
+    local missing_pkgs=()
+
+    for pkg in "${pkgs[@]}"; do
+        if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q " ok installed"; then
+            log "$pkg is already installed."
         else
-            dmsg "Skipped installing $pkg. This may affect functionality."
+            log "$pkg is not installed."
+            missing_pkgs+=("$pkg")
+        fi
+    done
+
+    if [[ ${#missing_pkgs[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    local pkg_list="${missing_pkgs[*]}"
+    if dconfirm "Do you want to install the following missing packages?\n$pkg_list"; then
+        if [[ -z "$APT_HAS_UPDATED" ]]; then
+            sudo apt update
+            APT_HAS_UPDATED=1
+        fi
+        if sudo apt install -y "${missing_pkgs[@]}"; then
+            log "Successfully installed packages: $pkg_list"
+            return 0
+        else
+            log "ERROR: Failed to install packages: $pkg_list"
+            dmsg "Failed to install packages. This may affect functionality."
             return 1
         fi
+    else
+        dmsg "Skipped installing packages: $pkg_list. This may affect functionality."
+        return 1
     fi
 }
 
@@ -478,8 +488,10 @@ install_pentest_tools() {
         local -a tools=("nmap" "sqlmap" "aircrack-ng" "hydra" "john" "metasploit-framework" "wireshark")
         local installed=0 failed=0
         
+        check_install "${tools[@]}"
+
         for tool in "${tools[@]}"; do
-            if check_install "$tool"; then
+            if dpkg-query -W -f='${Status}' "$tool" 2>/dev/null | grep -q " ok installed"; then
                 ((installed++)) || true
             else
                 ((failed++)) || true
@@ -634,8 +646,10 @@ install_conky() {
     local -a apps=("conky-all" "curl" "net-tools" "lsof" "xdg-utils" "rkhunter" "lm-sensors" "nmap" "upower")
     local installed_count=0
     
+    check_install "${apps[@]}"
+
     for pkg in "${apps[@]}"; do
-        if check_install "$pkg"; then
+        if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q " ok installed"; then
             ((installed_count++)) || true
         fi
     done
