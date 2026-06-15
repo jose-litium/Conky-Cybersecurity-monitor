@@ -117,7 +117,8 @@ Cmnd_Alias CONKY_SENSORS = /usr/sbin/sensors-detect
 Cmnd_Alias CONKY_LOGS = /usr/bin/journalctl --vacuum-time=1d
 
 # Allow user to run specific commands without password for monitoring only
-%usergroup ALL=(ALL) NOPASSWD: CONKY_RKHUNTER, CONKY_SENSORS, CONKY_LOGS
+%usergroup ALL=(ALL) NOPASSWD: CONKY_SENSORS, CONKY_LOGS
+%usergroup ALL=(ALL) PASSWD: CONKY_RKHUNTER
 EOF
 
     # Replace %usergroup with actual primary group of user for portability
