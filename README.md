@@ -67,7 +67,7 @@ chmod +x conky_cybersecurity_monitor.sh
 - Minimal sudo permissions via `/etc/sudoers.d/conky`  
 - All operations require explicit confirmation  
 - Audit logs: `/tmp/conky_gui.log`  
-- RKHunter warnings: `/tmp/rkhunter_warnings.txt`  
+- RKHunter warnings: `/var/log/rkhunter_warnings.txt`
 
 ---
 
