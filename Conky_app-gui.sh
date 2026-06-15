@@ -44,7 +44,7 @@ cleanup() {
     local exit_code=$?
     log "Script exiting with code: $exit_code"
     # Secure removal of sensitive temp files
-    rm -f /tmp/rkhunter_result.* /tmp/rkhunter_warnings*.txt /tmp/cpu_temp.txt 2>/dev/null || true
+    rm -f /tmp/rkhunter_result.* /tmp/rkhunter_warnings*.txt "$INSTALL_DIR/cpu_temp.txt" 2>/dev/null || true
     exit "$exit_code"
 }
 
@@ -263,7 +263,7 @@ set -euo pipefail
 # CPU Temperature Monitor for Conky
 # Writes safe, sanitized output to temp file
 
-readonly TEMP_FILE="/tmp/cpu_temp_$$_.txt"
+readonly TEMP_FILE="$INSTALL_DIR/cpu_temp.txt"
 readonly MAX_SAFE_TEMP=90
 
 cleanup() {
@@ -430,9 +430,8 @@ delete_temporaries() {
         "/tmp/rkhunter_warnings.txt"
         "/tmp/rkhunter_warnings_prev.txt"
         "/tmp/rkhunter_status.txt"
-        "/tmp/cpu_temp.txt"
+        "$INSTALL_DIR/cpu_temp.txt"
         "/tmp/rkhunter_result."*
-        "/tmp/cpu_temp_"*".txt"
         "/tmp/rkhunter_warnings_"*".txt"
     )
     
@@ -696,7 +695,7 @@ conky.text = [[
 \${color white}CPU: \${if_match \${cpu cpu0} > 80}\${color red}\${cpu cpu0}%\${else}\${color green}\${cpu cpu0}%\${endif} \${cpubar cpu0 10,}
 \${color white}RAM: \${if_match \${memperc} > 40}\${color red}\${memperc}%\${else}\${color green}\${memperc}%\${endif} \${membar 10}
 \${color white}Main HDD: \${if_match \${fs_used_perc /} > 60}\${color red}\${fs_used_perc /}%\${else}\${color green}\${fs_used_perc /}%\${endif} \${fs_bar /}
-\${color white}CPU Temp: \${color red}\${execi 10 cat /tmp/cpu_temp_*.txt 2>/dev/null | head -n1 || echo "N/A"}
+\${color white}CPU Temp: \${color red}\${execi 10 cat $home_dir/.local/conky_app/cpu_temp.txt 2>/dev/null | head -n1 || echo "N/A"}
 \${color white}Uptime: \${color green}\${uptime}
 
 \${color magenta}------ Network Information ------

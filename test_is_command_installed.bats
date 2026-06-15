@@ -6,7 +6,7 @@ setup() {
     # We can extract the function we want to test to a separate file or evaluate it.
 
     # Extract the is_command_installed function from Conky_app-gui.sh
-    eval "$(awk '/^function is_command_installed\(\) \{/{flag=1} flag; /^\}/{if(flag){flag=0; exit}}' Conky_app-gui.sh)"
+    eval "$(awk '/^is_command_installed\(\) \{/{flag=1} flag; /^\}/{if(flag){flag=0; exit}}' Conky_app-gui.sh)"
 }
 
 @test "is_command_installed returns 0 for existing command" {
