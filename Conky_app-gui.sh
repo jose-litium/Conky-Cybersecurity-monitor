@@ -18,7 +18,7 @@ set -euo pipefail
 # Global Configuration
 ########################################
 
-readonly LOGFILE="/tmp/conky_gui_$$_.log"
+LOGFILE="/tmp/conky_gui_$$_.log"
 readonly INSTALL_DIR="$HOME/.local/conky_app"
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly SCRIPT_PATH="$(readlink -f "$0")"
@@ -44,7 +44,7 @@ cleanup() {
     local exit_code=$?
     log "Script exiting with code: $exit_code"
     # Secure removal of sensitive temp files
-    rm -f /tmp/rkhunter_result.* /tmp/rkhunter_warnings*.txt /tmp/cpu_temp.txt 2>/dev/null || true
+    rm -f /tmp/rkhunter_result.* /tmp/rkhunter_warnings*.txt 2>/dev/null || true
     exit "$exit_code"
 }
 
@@ -263,36 +263,32 @@ set -euo pipefail
 # CPU Temperature Monitor for Conky
 # Writes safe, sanitized output to temp file
 
-readonly TEMP_FILE="/tmp/cpu_temp_$$_.txt"
+INSTALL_DIR="$HOME/.local/conky_app"
+readonly TEMP_FILE="$INSTALL_DIR/cpu_temp.txt"
 readonly MAX_SAFE_TEMP=90
-
-cleanup() {
-    rm -f "$TEMP_FILE" 2>/dev/null || true
-}
-trap cleanup EXIT
 
 while true; do
     # Safely extract temperature value
-    local temp_raw
     temp_raw="$(sensors 2>/dev/null | grep -Eo 'Package id 0:.*\+[0-9.]+' | head -n1 | grep -Eo '\+[0-9.]+' | tr -d '+' || echo "")"
     
+    write_val="N/A"
     if [[ -n "$temp_raw" ]]; then
         # Validate it's a number
         if [[ "$temp_raw" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-            local temp_val
             temp_val="$(printf "%.1f" "$temp_raw")"
             # Cap at MAX_SAFE_TEMP to avoid display issues
             if awk "BEGIN {exit !($temp_val > $MAX_SAFE_TEMP)}"; then
-                echo ">${MAX_SAFE_TEMP}°C" > "$TEMP_FILE"
+                write_val=">${MAX_SAFE_TEMP}°C"
             else
-                echo "${temp_val}°C" > "$TEMP_FILE"
+                write_val="${temp_val}°C"
             fi
-        else
-            echo "N/A" > "$TEMP_FILE"
         fi
-    else
-        echo "N/A" > "$TEMP_FILE"
     fi
+
+    tmp_file="$(mktemp "$INSTALL_DIR/cpu_temp.XXXXXX")"
+    echo "$write_val" > "$tmp_file"
+    mv "$tmp_file" "$TEMP_FILE"
+
     sleep 10
 done
 EOF
@@ -430,9 +426,7 @@ delete_temporaries() {
         "/tmp/rkhunter_warnings.txt"
         "/tmp/rkhunter_warnings_prev.txt"
         "/tmp/rkhunter_status.txt"
-        "/tmp/cpu_temp.txt"
         "/tmp/rkhunter_result."*
-        "/tmp/cpu_temp_"*".txt"
         "/tmp/rkhunter_warnings_"*".txt"
     )
     
@@ -447,7 +441,7 @@ delete_temporaries() {
 clear_logs() {
     clear_log_file
     dmsg "Log file cleared."
-    log "Log file truncated."
+    log "Log file cleared."
 }
 
 view_logs() {
@@ -696,7 +690,7 @@ conky.text = [[
 \${color white}CPU: \${if_match \${cpu cpu0} > 80}\${color red}\${cpu cpu0}%\${else}\${color green}\${cpu cpu0}%\${endif} \${cpubar cpu0 10,}
 \${color white}RAM: \${if_match \${memperc} > 40}\${color red}\${memperc}%\${else}\${color green}\${memperc}%\${endif} \${membar 10}
 \${color white}Main HDD: \${if_match \${fs_used_perc /} > 60}\${color red}\${fs_used_perc /}%\${else}\${color green}\${fs_used_perc /}%\${endif} \${fs_bar /}
-\${color white}CPU Temp: \${color red}\${execi 10 cat /tmp/cpu_temp_*.txt 2>/dev/null | head -n1 || echo "N/A"}
+\${color white}CPU Temp: \${color red}\${execi 10 cat \$HOME/.local/conky_app/cpu_temp.txt 2>/dev/null || echo "N/A"}
 \${color white}Uptime: \${color green}\${uptime}
 
 \${color magenta}------ Network Information ------
