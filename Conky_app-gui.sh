@@ -919,20 +919,29 @@ restore_system() {
     )
     
     local restored=0 skipped=0
+    local -a packages_to_install=()
     
     for pkg in "${essential_packages[@]}"; do
         if dconfirm "Reinstall $pkg?"; then
-            if sudo apt install -y "$pkg"; then
-                ((restored++)) || true
-                log "Restored package: $pkg"
-            else
-                log "ERROR: Failed to restore $pkg"
-            fi
+            packages_to_install+=("$pkg")
         else
             ((skipped++)) || true
             log "Skipped package: $pkg"
         fi
     done
+
+    if [[ ${#packages_to_install[@]} -gt 0 ]]; then
+        if sudo apt install -y "${packages_to_install[@]}"; then
+            for pkg in "${packages_to_install[@]}"; do
+                ((restored++)) || true
+                log "Restored package: $pkg"
+            done
+        else
+            for pkg in "${packages_to_install[@]}"; do
+                log "ERROR: Failed to restore $pkg"
+            done
+        fi
+    fi
     
     # Fix broken dependencies if requested
     if dconfirm "Run 'sudo apt --fix-broken install -y' to fix dependency issues?"; then
