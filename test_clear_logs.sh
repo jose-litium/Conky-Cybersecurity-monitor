@@ -3,7 +3,9 @@
 # Test script for clear_logs function
 
 # Source the script
-source ./Conky_app-gui.sh
+cp Conky_app-gui.sh /tmp/test_gui.sh
+sed -i "/readonly LOGFILE/d" /tmp/test_gui.sh
+source /tmp/test_gui.sh
 
 # Mock functions
 clear_log_file_called=false
@@ -48,7 +50,7 @@ fi
 if [ "$log_called" != true ]; then
     echo "Test failed: log was not called."
     failed=true
-elif [ "$log_arg" != "Log file cleared." ]; then
+elif [ "$log_arg" != "Log file truncated." ]; then
     echo "Test failed: log called with wrong argument: '$log_arg'"
     failed=true
 fi

@@ -3,7 +3,9 @@
 # Test script for clear_log_file in Conky_app-gui.sh
 
 # Source the main script
-source ./Conky_app-gui.sh
+cp Conky_app-gui.sh /tmp/test_gui.sh
+sed -i "/readonly LOGFILE/d" /tmp/test_gui.sh
+source /tmp/test_gui.sh
 
 # Override LOGFILE to a dummy file for testing
 export LOGFILE="/tmp/test_conky_gui.log"

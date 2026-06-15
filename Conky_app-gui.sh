@@ -20,6 +20,8 @@ set -euo pipefail
 
 readonly LOGFILE="/tmp/conky_gui_$$_.log"
 readonly INSTALL_DIR="$HOME/.local/conky_app"
+mkdir -p "$INSTALL_DIR"
+chmod 700 "$INSTALL_DIR"
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly SCRIPT_PATH="$(readlink -f "$0")"
 
@@ -44,7 +46,7 @@ cleanup() {
     local exit_code=$?
     log "Script exiting with code: $exit_code"
     # Secure removal of sensitive temp files
-    rm -f /tmp/rkhunter_result.* /tmp/rkhunter_warnings*.txt /tmp/cpu_temp.txt 2>/dev/null || true
+    rm -f /tmp/cpu_temp.txt 2>/dev/null || true
     exit "$exit_code"
 }
 
@@ -215,9 +217,8 @@ set -euo pipefail
 # Secure RKHunter scan script for Conky Monitor
 # Outputs warnings to a temp file for Conky to display
 
-readonly WARN_FILE="/tmp/rkhunter_warnings_$$.txt"
 readonly RESULT_FILE
-RESULT_FILE="$(mktemp /tmp/rkhunter_result.XXXXXX)"
+RESULT_FILE="$(mktemp)"
 
 cleanup() {
     rm -f "$RESULT_FILE" 2>/dev/null || true
@@ -231,24 +232,24 @@ sudo /usr/bin/rkhunter --propupd >/dev/null 2>&1 || true
 # Run check and capture output
 if sudo /usr/bin/rkhunter --check --sk > "$RESULT_FILE" 2>/dev/null; then
     # Extract only warning lines for Conky display
-    grep -iE "(warning|alert|suspect)" "$RESULT_FILE" > "$WARN_FILE" 2>/dev/null || true
+    grep -iE "(warning|alert|suspect)" "$RESULT_FILE" > "$HOME/.local/conky_app/rkhunter_warnings.txt" 2>/dev/null || true
     
     # Create comparison file for change detection
-    if [[ -f /tmp/rkhunter_warnings_prev.txt ]]; then
-        if ! cmp -s "$WARN_FILE" /tmp/rkhunter_warnings_prev.txt; then
-            cp "$WARN_FILE" /tmp/rkhunter_warnings_prev.txt
-            echo "CHANGED" > /tmp/rkhunter_status.txt
+    if [[ -f "$HOME/.local/conky_app/rkhunter_warnings_prev.txt" ]]; then
+        if ! cmp -s "$HOME/.local/conky_app/rkhunter_warnings.txt" "$HOME/.local/conky_app/rkhunter_warnings_prev.txt"; then
+            cp "$HOME/.local/conky_app/rkhunter_warnings.txt" "$HOME/.local/conky_app/rkhunter_warnings_prev.txt"
+            echo "CHANGED" > "$HOME/.local/conky_app/rkhunter_status.txt"
         else
-            echo "UNCHANGED" > /tmp/rkhunter_status.txt
+            echo "UNCHANGED" > "$HOME/.local/conky_app/rkhunter_status.txt"
         fi
     else
-        cp "$WARN_FILE" /tmp/rkhunter_warnings_prev.txt 2>/dev/null || true
-        echo "INITIAL" > /tmp/rkhunter_status.txt
+        cp "$HOME/.local/conky_app/rkhunter_warnings.txt" "$HOME/.local/conky_app/rkhunter_warnings_prev.txt" 2>/dev/null || true
+        echo "INITIAL" > "$HOME/.local/conky_app/rkhunter_status.txt"
     fi
 fi
 
 # Ensure file exists even if empty (for Conky to read)
-touch "$WARN_FILE"
+touch "$HOME/.local/conky_app/rkhunter_warnings.txt"
 EOF
     chmod 700 "$script_path"
     log "RKHunter scan script created at $script_path with secure permissions."
@@ -347,7 +348,7 @@ ExecStart=/usr/local/bin/rkhunter-auto-scan.sh
 RemainAfterExit=yes
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/tmp /var/log/rkhunter.log
+ReadWritePaths=/tmp /var/log/rkhunter.log /var/log/rkhunter_warnings.log
 
 [Install]
 WantedBy=multi-user.target
@@ -360,7 +361,7 @@ EOL
 set -euo pipefail
 # Automated RKHunter scan wrapper for systemd
 
-readonly WARN_FILE="/tmp/rkhunter_warnings.txt"
+readonly WARN_FILE="/var/log/rkhunter_warnings.log"
 readonly RESULT_FILE
 RESULT_FILE="$(mktemp)"
 
@@ -426,15 +427,9 @@ remove_rkhunter_service() {
 delete_temporaries() {
     # Resolved Git conflict: Keep comprehensive temp file cleanup
     local -a temp_files=(
-        "/tmp/rkhunter_result.txt"
-        "/tmp/rkhunter_warnings.txt"
-        "/tmp/rkhunter_warnings_prev.txt"
-        "/tmp/rkhunter_status.txt"
         "/tmp/cpu_temp.txt"
-        "/tmp/rkhunter_result."*
         "/tmp/cpu_temp_"*".txt"
-        "/tmp/rkhunter_warnings_"*".txt"
-    )
+        )
     
     for file in "${temp_files[@]}"; do
         rm -f $file 2>/dev/null || true
@@ -460,7 +455,7 @@ view_logs() {
 }
 
 view_rkhunter_warnings() {
-    local warn_log="/tmp/rkhunter_warnings.txt"
+    local warn_log="$HOME/.local/conky_app/rkhunter_warnings.txt"
     if [[ -f "$warn_log" && -s "$warn_log" ]]; then
         dialog --textbox "$warn_log" 20 70
     else
@@ -686,7 +681,7 @@ conky.config = {
 };
 
 conky.text = [[
-\${exec $home_dir/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
+\${exec ~/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
 \${color yellow}\${time %H:%M:%S}      Vietnam (GMT+7)
 \${color cyan}\${execi 10 TZ='Europe/Madrid' date '+%H:%M:%S'}      Madrid (GMT+1)
 \${color green}\${execi 10 TZ='Australia/Sydney' date '+%H:%M:%S'}      Sydney (GMT+10)
@@ -714,7 +709,7 @@ conky.text = [[
 \${color white}Recent Events: \${color red}\${execi 30 journalctl -n 5 -p 3 -u ssh.service --no-pager 2>/dev/null | tail -n 5 || echo "No recent events"}
 
 \${color magenta}------ Rootkit Alerts ------
-\${color white}Alerts: \${execi 600 bash -c 'if [[ -f /tmp/rkhunter_status.txt ]]; then status=\$(cat /tmp/rkhunter_status.txt); if [[ "\$status" == "CHANGED" ]]; then echo "New alerts - check /tmp/rkhunter_warnings.txt"; elif [[ -s /tmp/rkhunter_warnings.txt ]]; then echo "Alerts present"; else echo "No alerts"; fi; else echo "Initializing..."; fi'}
+\${color white}Alerts: \${execi 600 bash -c 'if [[ -f ~/.local/conky_app/rkhunter_status.txt ]]; then status=\$(cat ~/.local/conky_app/rkhunter_status.txt); if [[ "\$status" == "CHANGED" ]]; then echo "New alerts - check ~/.local/conky_app/rkhunter_warnings.txt"; elif [[ -s ~/.local/conky_app/rkhunter_warnings.txt ]]; then echo "Alerts present"; else echo "No alerts"; fi; else echo "Initializing..."; fi'}
 
 \${color magenta}------ Top 5 Processes ------
 \${color white}\${execi 5 ps -eo pid,comm,%cpu --sort=-%cpu 2>/dev/null | head -n 6 | tail -n 5}
@@ -854,7 +849,7 @@ restart_conky() {
 
 check_rkhunter() {
     echo -e "${BLUE}Running manual RKHunter scan...${NC}"
-    local warn_log="/tmp/rkhunter_warnings.txt"
+    local warn_log="$HOME/.local/conky_app/rkhunter_warnings.txt"
     
     # Run update and check
     if sudo /usr/bin/rkhunter --update >/dev/null 2>&1 && \

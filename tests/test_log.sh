@@ -5,6 +5,7 @@ set -e
 
 # Create a clean version of the script that we can source without running the UI
 cp Conky_app-gui.sh /tmp/Conky_app-gui-test.sh
+sed -i '/readonly LOGFILE/d' /tmp/Conky_app-gui-test.sh
 sed -i '/^# Main Menu (GUI with dialog)/,$d' /tmp/Conky_app-gui-test.sh
 
 # Source the functions
