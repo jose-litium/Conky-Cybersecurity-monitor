@@ -1,0 +1,4 @@
+## 2024-06-21 - Remove Predictable Temporary File Paths
+**Vulnerability:** Symlink attacks via predictable paths in world-writable directory (`/tmp/`). The script used predictable filenames for logs, state, and RKHunter warnings in `/tmp`, which could be exploited by an attacker to overwrite arbitrary files when executed with escalated privileges.
+**Learning:** Hardcoded predictable temporary files in world-writable directories are an inherently insecure pattern. They lead to race conditions, potential information disclosure, and symlink vulnerabilities. Ensure proper scope, particularly when tests also interact with the same exact paths!
+**Prevention:** Instead of using fixed names in `/tmp`, write directly to restrictive locations controlled by the application (e.g. `$HOME/.local/conky_app` and system log directory `/var/log`). Use `mktemp` properly inside specific user-owned scope.
