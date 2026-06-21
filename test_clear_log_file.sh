@@ -2,8 +2,14 @@
 
 # Test script for clear_log_file in Conky_app-gui.sh
 
+# Create a temporary copy of the script to modify it for testing
+cp ./Conky_app-gui.sh /tmp/Conky_app-gui-test.sh
+
+# Remove readonly attribute from LOGFILE
+sed -i 's/^readonly LOGFILE/LOGFILE/' /tmp/Conky_app-gui-test.sh
+
 # Source the main script
-source ./Conky_app-gui.sh
+source /tmp/Conky_app-gui-test.sh
 
 # Override LOGFILE to a dummy file for testing
 export LOGFILE="/tmp/test_conky_gui.log"
@@ -22,6 +28,6 @@ if [ -s "$LOGFILE" ]; then
     exit 1
 else
     echo "TEST PASSED: Log file is empty."
-    rm -f "$LOGFILE"
+    rm -f "$LOGFILE" /tmp/Conky_app-gui-test.sh
     exit 0
 fi
