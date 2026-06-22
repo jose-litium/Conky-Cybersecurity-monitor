@@ -18,8 +18,12 @@ set -euo pipefail
 # Global Configuration
 ########################################
 
-readonly LOGFILE="/tmp/conky_gui_$$_.log"
 readonly INSTALL_DIR="$HOME/.local/conky_app"
+# Create install directory with secure permissions
+mkdir -p "$INSTALL_DIR"
+chmod 0700 "$INSTALL_DIR"
+
+readonly LOGFILE="$INSTALL_DIR/conky_gui_$$_.log"
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly SCRIPT_PATH="$(readlink -f "$0")"
 

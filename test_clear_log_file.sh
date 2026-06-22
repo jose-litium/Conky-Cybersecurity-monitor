@@ -2,11 +2,15 @@
 
 # Test script for clear_log_file in Conky_app-gui.sh
 
+# Use sed to remove the readonly attribute to allow LOGFILE modification
+cp ./Conky_app-gui.sh /tmp/Conky_app-gui_test.sh
+sed -i 's/readonly LOGFILE/LOGFILE/g' /tmp/Conky_app-gui_test.sh
+
 # Source the main script
-source ./Conky_app-gui.sh
+source /tmp/Conky_app-gui_test.sh
 
 # Override LOGFILE to a dummy file for testing
-export LOGFILE="/tmp/test_conky_gui.log"
+LOGFILE="/tmp/test_conky_gui.log"
 
 # Create some dummy content
 echo "dummy log entry 1" > "$LOGFILE"
