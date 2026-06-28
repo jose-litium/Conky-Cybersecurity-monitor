@@ -95,14 +95,14 @@ check_install() {
 # ------------------------------------------------------------------------------
 create_rkhunter_scan_script() {
     local SCRIPT="$INSTALL_DIR/rkhunter_scan.sh"
-    cat <<'EOF' > "$SCRIPT"
+    cat <<EOF > "$SCRIPT"
 #!/usr/bin/env bash
-TMP_RESULT=$(mktemp /tmp/rkhunter_result.XXXXXX)
-sudo rkhunter --update > /dev/null 2>&1 && \
-sudo rkhunter --propupd > /dev/null 2>&1 && \
-sudo rkhunter --check --sk > "$TMP_RESULT" 2>/dev/null && \
-grep -i "warning" "$TMP_RESULT" > /tmp/rkhunter_warnings.txt
-rm -f "$TMP_RESULT"
+TMP_RESULT=\$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")
+sudo rkhunter --update > /dev/null 2>&1 && \\
+sudo rkhunter --propupd > /dev/null 2>&1 && \\
+sudo rkhunter --check --sk > "\$TMP_RESULT" 2>/dev/null && \\
+grep -i "warning" "\$TMP_RESULT" > "/var/log/rkhunter_warnings.txt"
+rm -f "\$TMP_RESULT"
 EOF
     chmod +x "$SCRIPT"
 }
@@ -179,7 +179,7 @@ Description=Escaneo Automático con RKHunter
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'TMP_RESULT=\$\$(mktemp /tmp/rkhunter_result.XXXXXX); rkhunter --update > /dev/null 2>&1 && rkhunter --propupd > /dev/null 2>&1 && rkhunter --check --sk > "\$\$TMP_RESULT" 2>/dev/null; grep -i "warning" "\$\$TMP_RESULT" > /tmp/rkhunter_warnings.txt; rm -f "\$\$TMP_RESULT"'
+ExecStart=/bin/bash -c 'TMP_RESULT=\$\$(mktemp); rkhunter --update > /dev/null 2>&1 && rkhunter --propupd > /dev/null 2>&1 && rkhunter --check --sk > "\$\$TMP_RESULT" 2>/dev/null; grep -i "warning" "\$\$TMP_RESULT" > /var/log/rkhunter_warnings.txt; chmod 644 /var/log/rkhunter_warnings.txt 2>/dev/null; rm -f "\$\$TMP_RESULT"'
 RemainAfterExit=yes
 EOL
 
@@ -199,7 +199,7 @@ EOL
     sudo systemctl enable rkhunter-auto.timer
     sudo systemctl start rkhunter-auto.timer
     echo -e "${GREEN}Servicio y temporizador automático de RKHunter instalados.${NC}"
-    echo -e "${YELLOW}Log de alertas: /tmp/rkhunter_warnings.txt${NC}"
+    echo -e "${YELLOW}Log de alertas: /var/log/rkhunter_warnings.txt${NC}"
 }
 
 # ------------------------------------------------------------------------------
@@ -308,7 +308,7 @@ conky.text = [[
 \${color white}Eventos Recientes: \${color red}\${execi 30 journalctl -n 5 -p 3 -u ssh.service --no-pager | tail -n 5}
 
 \${color magenta}------ Alertas de Rootkit ------
-\${color white}Alertas: \${execi 600 bash -c 'if [ -f /tmp/rkhunter_warnings_prev.txt ]; then if cmp -s /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; then echo "0"; else echo "1"; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; fi; else if [ -s /tmp/rkhunter_warnings.txt ]; then echo "1"; cp /tmp/rkhunter_warnings.txt /tmp/rkhunter_warnings_prev.txt; else echo "0"; fi; fi'} \${color yellow}*Log: \${color #CCCCCC}/tmp/rkhunter_warnings.txt
+\${color white}Alertas: \${execi 600 bash -c 'if [ -f /var/log/rkhunter_warnings_prev.txt ]; then if cmp -s /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt; then echo "0"; else echo "1"; cp /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt; fi; else if [ -s /var/log/rkhunter_warnings.txt ] ; then echo "1"; cp /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt 2>/dev/null; else echo "0"; fi; fi'} \${color yellow}*Log: \${color #CCCCCC}/var/log/rkhunter_warnings.txt
 
 \${color magenta}------ Top 5 Procesos ------
 \${color white}\${execi 5 ps -eo pid,comm,%cpu --sort=-%cpu | head -n 6 | tail -n 5}
@@ -432,11 +432,11 @@ restart_conky() {
 # ------------------------------------------------------------------------------
 check_rkhunter() {
     echo -e "${BLUE}Ejecutando escaneo con RKHunter...${NC}"
-    local WARN_LOG="/tmp/rkhunter_warnings.txt"
+    local WARN_LOG="/var/log/rkhunter_warnings.txt"
     sudo rkhunter --update > /dev/null 2>&1
     sudo rkhunter --propupd > /dev/null 2>&1
     local TMP_RESULT
-    TMP_RESULT=$(mktemp /tmp/rkhunter_result.XXXXXX)
+    TMP_RESULT=$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")
     sudo rkhunter --check --sk > "$TMP_RESULT" 2>/dev/null
     grep -i "warning" "$TMP_RESULT" > "$WARN_LOG"
     rm -f "$TMP_RESULT"
