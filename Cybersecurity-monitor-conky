@@ -504,8 +504,11 @@ restore_system() {
 
     if ! dpkg -s google-chrome-stable &>/dev/null; then
          if dconfirm "Google Chrome no está instalado. ¿Deseas instalarlo?"; then
-             wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome-stable_current_amd64.deb
-             sudo dpkg -i /tmp/google-chrome-stable_current_amd64.deb || sudo apt -f install -y
+             local TMP_DIR
+             TMP_DIR="$(mktemp -d)"
+             wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O "$TMP_DIR/google-chrome-stable_current_amd64.deb"
+             sudo dpkg -i "$TMP_DIR/google-chrome-stable_current_amd64.deb" || sudo apt -f install -y
+             rm -rf "$TMP_DIR"
          else
              echo -e "${YELLOW}Saltando instalación de Google Chrome.${NC}"
          fi
