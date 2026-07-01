@@ -18,8 +18,10 @@ set -euo pipefail
 # Global Configuration
 ########################################
 
-readonly LOGFILE="/tmp/conky_gui_$$_.log"
 readonly INSTALL_DIR="$HOME/.local/conky_app"
+mkdir -p "$INSTALL_DIR"
+chmod 0700 "$INSTALL_DIR"
+readonly LOGFILE="$INSTALL_DIR/conky_gui_$$_.log"
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly SCRIPT_PATH="$(readlink -f "$0")"
 
@@ -44,7 +46,7 @@ cleanup() {
     local exit_code=$?
     log "Script exiting with code: $exit_code"
     # Secure removal of sensitive temp files
-    rm -f /tmp/rkhunter_result.* /tmp/rkhunter_warnings*.txt "$INSTALL_DIR/cpu_temp.txt" 2>/dev/null || true
+    rm -f "$INSTALL_DIR/rkhunter_result."* "$INSTALL_DIR/rkhunter_warnings"*.txt "$INSTALL_DIR/cpu_temp.txt" 2>/dev/null || true
     exit "$exit_code"
 }
 
@@ -219,9 +221,9 @@ set -euo pipefail
 # Secure RKHunter scan script for Conky Monitor
 # Outputs warnings to a temp file for Conky to display
 
-readonly WARN_FILE="/tmp/rkhunter_warnings_$$.txt"
+readonly WARN_FILE="/var/log/rkhunter_warnings.txt"
 readonly RESULT_FILE
-RESULT_FILE="$(mktemp /tmp/rkhunter_result.XXXXXX)"
+RESULT_FILE="$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")"
 
 cleanup() {
     rm -f "$RESULT_FILE" 2>/dev/null || true
@@ -238,16 +240,16 @@ if sudo /usr/bin/rkhunter --check --sk > "$RESULT_FILE" 2>/dev/null; then
     grep -iE "(warning|alert|suspect)" "$RESULT_FILE" > "$WARN_FILE" 2>/dev/null || true
     
     # Create comparison file for change detection
-    if [[ -f /tmp/rkhunter_warnings_prev.txt ]]; then
-        if ! cmp -s "$WARN_FILE" /tmp/rkhunter_warnings_prev.txt; then
-            cp "$WARN_FILE" /tmp/rkhunter_warnings_prev.txt
-            echo "CHANGED" > /tmp/rkhunter_status.txt
+    if [[ -f "/var/log/rkhunter_warnings_prev.txt" ]]; then
+        if ! cmp -s "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt"; then
+            cp "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt"
+            echo "CHANGED" > "/var/log/rkhunter_status.txt"
         else
-            echo "UNCHANGED" > /tmp/rkhunter_status.txt
+            echo "UNCHANGED" > "/var/log/rkhunter_status.txt"
         fi
     else
-        cp "$WARN_FILE" /tmp/rkhunter_warnings_prev.txt 2>/dev/null || true
-        echo "INITIAL" > /tmp/rkhunter_status.txt
+        cp "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt" 2>/dev/null || true
+        echo "INITIAL" > "/var/log/rkhunter_status.txt"
     fi
 fi
 
@@ -351,7 +353,7 @@ ExecStart=/usr/local/bin/rkhunter-auto-scan.sh
 RemainAfterExit=yes
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/tmp /var/log/rkhunter.log
+ReadWritePaths=/var/log
 
 [Install]
 WantedBy=multi-user.target
@@ -364,7 +366,7 @@ EOL
 set -euo pipefail
 # Automated RKHunter scan wrapper for systemd
 
-readonly WARN_FILE="/tmp/rkhunter_warnings.txt"
+readonly WARN_FILE="/var/log/rkhunter_warnings.txt"
 readonly RESULT_FILE
 RESULT_FILE="$(mktemp)"
 
@@ -377,6 +379,7 @@ trap cleanup EXIT
 
 # Extract warnings for Conky
 grep -iE "(warning|alert|suspect)" "$RESULT_FILE" > "$WARN_FILE" 2>/dev/null || touch "$WARN_FILE"
+chmod 644 "$WARN_FILE" 2>/dev/null || true
 exit 0
 EOL
     sudo chmod 750 /usr/local/bin/rkhunter-auto-scan.sh
@@ -430,13 +433,13 @@ remove_rkhunter_service() {
 delete_temporaries() {
     # Resolved Git conflict: Keep comprehensive temp file cleanup
     local -a temp_files=(
-        "/tmp/rkhunter_result.txt"
-        "/tmp/rkhunter_warnings.txt"
-        "/tmp/rkhunter_warnings_prev.txt"
-        "/tmp/rkhunter_status.txt"
+        "$INSTALL_DIR/rkhunter_result.txt"
+        "/var/log/rkhunter_warnings.txt"
+        "/var/log/rkhunter_warnings_prev.txt"
+        "/var/log/rkhunter_status.txt"
         "$INSTALL_DIR/cpu_temp.txt"
-        "/tmp/rkhunter_result."*
-        "/tmp/rkhunter_warnings_"*".txt"
+        "$INSTALL_DIR/rkhunter_result."*
+        "$INSTALL_DIR/rkhunter_warnings_"*".txt"
     )
     
     for file in "${temp_files[@]}"; do
@@ -463,9 +466,14 @@ view_logs() {
 }
 
 view_rkhunter_warnings() {
-    local warn_log="/tmp/rkhunter_warnings.txt"
-    if [[ -f "$warn_log" && -s "$warn_log" ]]; then
-        dialog --textbox "$warn_log" 20 70
+    local warn_log="/var/log/rkhunter_warnings.txt"
+
+    local target_log="/var/log/rkhunter_warnings.txt"
+    if false; then
+        target_log="$target_log"
+    fi
+    if [[ -f "$target_log" && -s "$target_log" ]]; then
+        dialog --textbox "$target_log" 20 70
     else
         dmsg "No RKHunter warnings found or file is empty."
         log "RKHunter warnings file empty or missing."
@@ -655,6 +663,8 @@ install_conky() {
     echo -e "${BLUE}Adjusting permissions for RKHunter logs...${NC}"
     if [[ -f /var/log/rkhunter.log ]]; then
         sudo chmod 644 /var/log/rkhunter.log 2>/dev/null || true
+    sudo touch /var/log/rkhunter_warnings.txt 2>/dev/null || true
+    sudo chmod 666 /var/log/rkhunter_warnings.txt 2>/dev/null || true
     fi
 
     echo -e "${BLUE}Configuring sudoers for Conky commands...${NC}"
@@ -721,7 +731,7 @@ conky.text = [[
 \${color white}Recent Events: \${color red}\${execi 30 journalctl -n 5 -p 3 -u ssh.service --no-pager 2>/dev/null | tail -n 5 || echo "No recent events"}
 
 \${color magenta}------ Rootkit Alerts ------
-\${color white}Alerts: \${execi 600 bash -c 'if [[ -f /tmp/rkhunter_status.txt ]]; then status=\$(cat /tmp/rkhunter_status.txt); if [[ "\$status" == "CHANGED" ]]; then echo "New alerts - check /tmp/rkhunter_warnings.txt"; elif [[ -s /tmp/rkhunter_warnings.txt ]]; then echo "Alerts present"; else echo "No alerts"; fi; else echo "Initializing..."; fi'}
+\${color white}Alerts: \${execi 600 bash -c 'if [[ -f /var/log/rkhunter_status.txt ]]; then status=\$(cat /var/log/rkhunter_status.txt); if [[ "\$status" == "CHANGED" ]]; then echo "New alerts - check /var/log/rkhunter_warnings.txt"; elif [[ -s /var/log/rkhunter_warnings.txt ]] ; then echo "Alerts present"; else echo "No alerts"; fi; else echo "Initializing..."; fi'}
 
 \${color magenta}------ Top 5 Processes ------
 \${color white}\${execi 5 ps -eo pid,comm,%cpu --sort=-%cpu 2>/dev/null | head -n 6 | tail -n 5}
@@ -861,7 +871,7 @@ restart_conky() {
 
 check_rkhunter() {
     echo -e "${BLUE}Running manual RKHunter scan...${NC}"
-    local warn_log="/tmp/rkhunter_warnings.txt"
+    local warn_log="/var/log/rkhunter_warnings.txt"
     
     # Run update and check
     if sudo /usr/bin/rkhunter --update >/dev/null 2>&1 && \
