@@ -2,3 +2,8 @@
 **Vulnerability:** Predictable temporary files in /tmp/ (e.g. /tmp/rkhunter_warnings.txt)
 **Learning:** Unified state files are critical. When migrating temporary files to a secure location, ensure that both root-level services (systemd timers) and user-level scripts (manual scans) can access the unified file. In this case, setting up /var/log/rkhunter_warnings.txt with correct permissions allows both to use a single state tracker without splitting the conky widget logic.
 **Prevention:** Avoid /tmp/ for predictable files. Use /var/log/ for system-wide logs, and ensure shared files have explicitly managed permissions (e.g. chmod 666 if a non-root user needs write access, or chown).
+
+## 2026-06-28 - [Fix Insecure Temporary File Download for Google Chrome]
+**Vulnerability:** The script downloads google-chrome-stable_current_amd64.deb to a predictable, hardcoded path in the world-writable /tmp/ directory (/tmp/google-chrome-stable_current_amd64.deb) before installing it with sudo dpkg. This introduces a Time-of-Check to Time-of-Use (TOCTOU) and symlink vulnerability that could be exploited for Local Privilege Escalation (LPE) by an attacker who places a malicious file or symlink at that path before or during the download.
+**Learning:** Using predictable file paths in world-writable directories like /tmp/ is dangerous, especially when the file is subsequently acted upon with elevated privileges (sudo). An attacker can pre-create the file or manipulate it between download and execution.
+**Prevention:** Always use securely generated temporary files or directories (e.g., using mktemp) for downloads or intermediate files, particularly those that will be processed with root privileges. Clean up the temporary files securely afterwards.
