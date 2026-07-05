@@ -443,7 +443,7 @@ delete_temporaries() {
     )
     
     for file in "${temp_files[@]}"; do
-        rm -f $file 2>/dev/null || true
+        rm -f "$file" 2>/dev/null || true
     done
     
     dmsg "Temporary files deleted securely."
