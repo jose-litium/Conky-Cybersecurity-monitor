@@ -502,10 +502,16 @@ restore_system() {
          echo -e "${YELLOW}Saltando corrección de dependencias.${NC}"
     fi
 
-    if ! dpkg -s google-chrome-stable &>/dev/null; then
+    if ! dpkg-query -W -f='${Status}' "google-chrome-stable" 2>/dev/null | grep -q " ok installed"; then
          if dconfirm "Google Chrome no está instalado. ¿Deseas instalarlo?"; then
-             wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome-stable_current_amd64.deb
-             sudo dpkg -i /tmp/google-chrome-stable_current_amd64.deb || sudo apt -f install -y
+             local chrome_tmp
+             chrome_tmp=$(mktemp -d)
+             if wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O "$chrome_tmp/google-chrome-stable_current_amd64.deb"; then
+                 sudo dpkg -i "$chrome_tmp/google-chrome-stable_current_amd64.deb" || sudo apt -f install -y
+             else
+                 echo -e "${RED}Error al descargar Google Chrome.${NC}"
+             fi
+             rm -rf "$chrome_tmp"
          else
              echo -e "${YELLOW}Saltando instalación de Google Chrome.${NC}"
          fi
