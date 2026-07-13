@@ -136,7 +136,9 @@ create_temp_monitor_script() {
 #!/usr/bin/env bash
 while true; do
     temp=$(sensors | grep -Eo '\+[0-9]+(\.[0-9]+)?°C' | head -n1)
-    echo "${temp:-N/A}" > "$INSTALL_DIR/cpu_temp.txt"
+    tmp_file=$(mktemp "$INSTALL_DIR/cpu_temp.XXXXXX")
+    echo "${temp:-N/A}" > "$tmp_file"
+    mv "$tmp_file" "$INSTALL_DIR/cpu_temp.txt"
     sleep 10
 done
 EOF

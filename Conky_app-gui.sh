@@ -288,16 +288,25 @@ while true; do
             local temp_val
             temp_val="$(printf "%.1f" "$temp_raw")"
             # Cap at MAX_SAFE_TEMP to avoid display issues
+            local tmp_file
+            tmp_file="$(mktemp "$INSTALL_DIR/cpu_temp.XXXXXX")"
             if awk "BEGIN {exit !($temp_val > $MAX_SAFE_TEMP)}"; then
-                echo ">${MAX_SAFE_TEMP}°C" > "$TEMP_FILE"
+                echo ">${MAX_SAFE_TEMP}°C" > "$tmp_file"
             else
-                echo "${temp_val}°C" > "$TEMP_FILE"
+                echo "${temp_val}°C" > "$tmp_file"
             fi
+            mv "$tmp_file" "$TEMP_FILE"
         else
-            echo "N/A" > "$TEMP_FILE"
+            local tmp_file
+            tmp_file="$(mktemp "$INSTALL_DIR/cpu_temp.XXXXXX")"
+            echo "N/A" > "$tmp_file"
+            mv "$tmp_file" "$TEMP_FILE"
         fi
     else
-        echo "N/A" > "$TEMP_FILE"
+        local tmp_file
+        tmp_file="$(mktemp "$INSTALL_DIR/cpu_temp.XXXXXX")"
+        echo "N/A" > "$tmp_file"
+        mv "$tmp_file" "$TEMP_FILE"
     fi
     sleep 10
 done
