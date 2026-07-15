@@ -12,3 +12,7 @@
 **Vulnerability:** Conky continuously reads `cpu_temp.txt` which is written directly with `echo > cpu_temp.txt` in a loop.
 **Learning:** For files that are updated frequently and read by external processes (e.g., Conky sensor metrics), writing to them directly can result in the external process reading a partially written file, leading to corruption or display errors.
 **Prevention:** Implement atomic writes by writing data to a temporary file via `mktemp` and then moving it into place with `mv`. This ensures that the external process always reads a complete, valid state file.
+## 2026-09-02 - [Fix Insecure Sudoers Argument Matching]
+**Vulnerability:** Complex argument matching in sudoers (`/etc/sudoers.d/conky-monitor`) via `Cmnd_Alias` to restrict `rkhunter` command arguments (`--update`, `--propupd`, `--check --sk`).
+**Learning:** Depending on `sudo`'s string matching for security boundaries can be risky and brittle against unexpected spaces or escaping techniques. It can also clutter the sudoers file making it hard to audit.
+**Prevention:** When you need to restrict a command with specific arguments for `NOPASSWD` access, use a dedicated bash wrapper script. The wrapper uses a strict `case` statement, ignores trailing garbage input, and executes the target binary unconditionally with known-safe arguments using `exec`. Grant `NOPASSWD` only to this specific wrapper script.
