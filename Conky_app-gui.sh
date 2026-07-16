@@ -248,9 +248,9 @@ set -euo pipefail
 # Secure RKHunter scan script for Conky Monitor
 # Outputs warnings to a temp file for Conky to display
 
+readonly INSTALL_DIR="$HOME/.local/conky_app"
 readonly WARN_FILE="/var/log/rkhunter_warnings.txt"
-readonly RESULT_FILE
-RESULT_FILE="$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")"
+readonly RESULT_FILE="$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")"
 
 cleanup() {
     rm -f "$RESULT_FILE" 2>/dev/null || true
@@ -296,6 +296,7 @@ set -euo pipefail
 # CPU Temperature Monitor for Conky
 # Writes safe, sanitized output to temp file
 
+readonly INSTALL_DIR="$HOME/.local/conky_app"
 readonly TEMP_FILE="$INSTALL_DIR/cpu_temp.txt"
 readonly MAX_SAFE_TEMP=90
 
@@ -403,8 +404,7 @@ set -euo pipefail
 # Automated RKHunter scan wrapper for systemd
 
 readonly WARN_FILE="/var/log/rkhunter_warnings.txt"
-readonly RESULT_FILE
-RESULT_FILE="$(mktemp)"
+readonly RESULT_FILE="$(mktemp)"
 
 cleanup() { rm -f "$RESULT_FILE" 2>/dev/null || true; }
 trap cleanup EXIT
