@@ -393,24 +393,26 @@ EOL
 
     # Create the actual scan script with proper permissions
     sudo mkdir -p /usr/local/bin
-    sudo tee /usr/local/bin/rkhunter-auto-scan.sh > /dev/null <<'EOL'
+    sudo tee /usr/local/bin/rkhunter-auto-scan.sh > /dev/null <<EOL
 #!/usr/bin/env bash
 set -euo pipefail
 # Automated RKHunter scan wrapper for systemd
 
 readonly WARN_FILE="/var/log/rkhunter_warnings.txt"
-readonly RESULT_FILE="$(mktemp)"
+readonly RESULT_FILE="\$(mktemp)"
+readonly CONKY_USER="${USER}"
 
-cleanup() { rm -f "$RESULT_FILE" 2>/dev/null || true; }
+cleanup() { rm -f "\$RESULT_FILE" 2>/dev/null || true; }
 trap cleanup EXIT
 
 /usr/bin/rkhunter --update >/dev/null 2>&1 || true
 /usr/bin/rkhunter --propupd >/dev/null 2>&1 || true
-/usr/bin/rkhunter --check --sk > "$RESULT_FILE" 2>/dev/null || true
+/usr/bin/rkhunter --check --sk > "\$RESULT_FILE" 2>/dev/null || true
 
 # Extract warnings for Conky
-grep -iE "(warning|alert|suspect)" "$RESULT_FILE" > "$WARN_FILE" 2>/dev/null || touch "$WARN_FILE"
-chmod 644 "$WARN_FILE" 2>/dev/null || true
+grep -iE "(warning|alert|suspect)" "\$RESULT_FILE" > "\$WARN_FILE" 2>/dev/null || touch "\$WARN_FILE"
+chown "\${CONKY_USER}:\${CONKY_USER}" "\$WARN_FILE" 2>/dev/null || true
+chmod 644 "\$WARN_FILE" 2>/dev/null || true
 exit 0
 EOL
     sudo chmod 750 /usr/local/bin/rkhunter-auto-scan.sh
@@ -694,9 +696,10 @@ install_conky() {
     echo -e "${BLUE}Adjusting permissions for RKHunter logs...${NC}"
     if [[ -f /var/log/rkhunter.log ]]; then
         sudo chmod 644 /var/log/rkhunter.log 2>/dev/null || true
-    sudo touch /var/log/rkhunter_warnings.txt 2>/dev/null || true
-    sudo chmod 666 /var/log/rkhunter_warnings.txt 2>/dev/null || true
     fi
+    sudo touch /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt /var/log/rkhunter_status.txt 2>/dev/null || true
+    sudo chown "${USER}:${USER}" /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt /var/log/rkhunter_status.txt 2>/dev/null || true
+    sudo chmod 644 /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt /var/log/rkhunter_status.txt 2>/dev/null || true
 
     echo -e "${BLUE}Configuring sudoers for Conky commands...${NC}"
     if ! setup_sudoers; then

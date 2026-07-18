@@ -26,3 +26,8 @@
 **Vulnerability:** Dynamically templating `sudoers` rules with primary groups (e.g., `%usergroup`) instead of specific users (`$USER`).
 **Learning:** Using primary groups in `sudoers` can grant `NOPASSWD` privileges to other users on the system who happen to share the same primary group, leading to unintended privilege escalation. This is especially dangerous when the intention is to only authorize a specific user running the script.
 **Prevention:** When dynamically templating `sudoers` rules, authorize specific users directly (e.g., `$USER`) rather than primary groups to prevent unintended privilege escalation for unprivileged users sharing that primary group.
+
+## 2026-12-05 - [Fix World-Writable File Vulnerability]
+**Vulnerability:** System-wide state logs like `/var/log/rkhunter_warnings.txt` were configured with `chmod 666`, allowing any user on the system to write, overwrite, or corrupt these security alerts.
+**Learning:** This occurred because a root systemd service generated the log, while unprivileged user scripts needed to read and clear it. Using `chmod 666` as a quick fix bypassed proper ownership controls.
+**Prevention:** Instead of using world-writable permissions, establish proper ownership using `chown` to the specific non-root user that requires access. If a root-executed systemd job modifies the file, it must reassert that specific user's ownership (`chown "${USER}:${USER}"`) rather than broadening permissions to all users.
