@@ -2,6 +2,16 @@
 # shellcheck disable=SC2034
 set -euo pipefail
 
+########################################
+# Input Validation & Security Checks
+########################################
+
+# Validate USER variable to prevent command injection in sudoers and systemd services
+if [[ ! "${USER:-}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "Error: Invalid username format detected in \$USER. Aborting for security." >&2
+    exit 1
+fi
+
 # Conky Cybersecurity Monitor – Full App (Hardened & ShellCheck Compliant)
 #
 # Este script instala, configura y gestiona Conky junto con herramientas de seguridad
@@ -393,6 +403,11 @@ EOL
 
     # Create the actual scan script with proper permissions
     sudo mkdir -p /usr/local/bin
+
+    # Safely escape the username as defense in depth
+    local safe_user
+    safe_user="$(printf '%q' "$USER")"
+
     sudo tee /usr/local/bin/rkhunter-auto-scan.sh > /dev/null <<EOL
 #!/usr/bin/env bash
 set -euo pipefail
@@ -400,7 +415,7 @@ set -euo pipefail
 
 readonly WARN_FILE="/var/log/rkhunter_warnings.txt"
 readonly RESULT_FILE="\$(mktemp)"
-readonly CONKY_USER="${USER}"
+readonly CONKY_USER=${safe_user}
 
 cleanup() { rm -f "\$RESULT_FILE" 2>/dev/null || true; }
 trap cleanup EXIT
