@@ -31,3 +31,8 @@
 **Vulnerability:** System-wide state logs like `/var/log/rkhunter_warnings.txt` were configured with `chmod 666`, allowing any user on the system to write, overwrite, or corrupt these security alerts.
 **Learning:** This occurred because a root systemd service generated the log, while unprivileged user scripts needed to read and clear it. Using `chmod 666` as a quick fix bypassed proper ownership controls.
 **Prevention:** Instead of using world-writable permissions, establish proper ownership using `chown` to the specific non-root user that requires access. If a root-executed systemd job modifies the file, it must reassert that specific user's ownership (`chown "${USER}:${USER}"`) rather than broadening permissions to all users.
+
+## 2026-12-28 - [Fix Insecure Template Variable Expansion]
+**Vulnerability:** The `$USER` variable was directly expanded without validation in unquoted heredocs (e.g. `cat <<EOF`) and used to grant sudoers permissions and execute systemd processes as that user.
+**Learning:** Shells expand environment variables before passing the string to `sudo tee`. A malicious user could set `USER='evil-user ALL=(ALL) NOPASSWD: ALL'` prior to running the installation script, enabling severe privilege escalation via command or configuration injection.
+**Prevention:** Always validate external inputs before they are interpolated into critical configuration files. For variables like `USER`, validate it against a restrictive whitelist regex (e.g., `^[a-zA-Z0-9_-]+$`) and securely escape the content using `printf '%q'` prior to string templating.
