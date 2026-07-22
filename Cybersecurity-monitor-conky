@@ -55,6 +55,14 @@ dmenu() {
 }
 
 # ------------------------------------------------------------------------------
+# Validate and escape USER to prevent Command Injection in heredocs
+if [[ ! "${USER:-}" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+    echo "ERROR: Invalid USER environment variable. It contains unsafe characters." >&2
+    exit 1
+fi
+printf -v SAFE_USER '%q' "${USER}"
+readonly SAFE_USER
+
 # Solicitar privilegios sudo al inicio
 # ------------------------------------------------------------------------------
 dmsg "Se requieren privilegios de administrador para instalar paquetes."
@@ -256,7 +264,7 @@ install_conky() {
 
     mkdir -p ~/.config/conky
 
-    USERNAME="$USER"
+    USERNAME="$SAFE_USER"
     echo -e "${BLUE}Creando configuración de Conky...${NC}"
     cat <<EOL > ~/.config/conky/conky.conf
 conky.config = {
@@ -327,7 +335,7 @@ After=default.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/conky -b -c "/home/$USER/.config/conky/conky.conf"
+ExecStart=/usr/bin/conky -b -c "/home/$SAFE_USER/.config/conky/conky.conf"
 Restart=on-failure
 
 [Install]
