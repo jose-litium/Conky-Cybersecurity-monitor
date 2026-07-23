@@ -31,3 +31,8 @@
 **Vulnerability:** System-wide state logs like `/var/log/rkhunter_warnings.txt` were configured with `chmod 666`, allowing any user on the system to write, overwrite, or corrupt these security alerts.
 **Learning:** This occurred because a root systemd service generated the log, while unprivileged user scripts needed to read and clear it. Using `chmod 666` as a quick fix bypassed proper ownership controls.
 **Prevention:** Instead of using world-writable permissions, establish proper ownership using `chown` to the specific non-root user that requires access. If a root-executed systemd job modifies the file, it must reassert that specific user's ownership (`chown "${USER}:${USER}"`) rather than broadening permissions to all users.
+
+## 2026-12-06 - [Fix Privilege Escalation via Unquoted Heredoc Injection]
+**Vulnerability:** Direct injection of the `$USER` variable into root-level bash scripts and sudoers configurations generated via unquoted heredocs.
+**Learning:** If an attacker can control the `$USER` environment variable, they could inject arbitrary commands into root-level bash scripts or add unauthorized rules to `/etc/sudoers.d/`, resulting in Command Injection or Privilege Escalation. Unquoted heredocs allow early expansion of environment variables before the script is fully written or executed.
+**Prevention:** To persist an unprivileged user's identity into root-level wrapper scripts dynamically generated via unquoted heredocs, the `$USER` variable must be strictly validated (e.g., using regex `^[a-zA-Z0-9_.-]+$`) and securely escaped (e.g., using `printf '%q'`) before injection.
