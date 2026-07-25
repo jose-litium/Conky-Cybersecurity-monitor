@@ -492,6 +492,9 @@ delete_temporaries() {
     )
     
     for file in "${temp_files[@]}"; do
+        if [[ -w "$file" ]]; then
+            : > "$file" 2>/dev/null || true
+        fi
         rm -f "$file" 2>/dev/null || true
     done
     
