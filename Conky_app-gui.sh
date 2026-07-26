@@ -492,6 +492,10 @@ delete_temporaries() {
     )
     
     for file in "${temp_files[@]}"; do
+        # Securely truncate files that cannot be removed (e.g. in /var/log)
+        if [[ -f "$file" && -w "$file" ]]; then
+            : > "$file"
+        fi
         rm -f "$file" 2>/dev/null || true
     done
     
@@ -943,7 +947,11 @@ check_rkhunter() {
             else
                 dmsg "Scan complete: No alerts detected."
                 log "RKHunter manual scan: Clean"
-                rm -f "$warn_log"
+                # Securely truncate file that cannot be removed
+                if [[ -f "$warn_log" && -w "$warn_log" ]]; then
+                    : > "$warn_log"
+                fi
+                rm -f "$warn_log" 2>/dev/null || true
             fi
         else
             dmsg "RKHunter check failed. Check logs for details."
