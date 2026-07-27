@@ -12,6 +12,7 @@
 **Vulnerability:** Conky continuously reads `cpu_temp.txt` which is written directly with `echo > cpu_temp.txt` in a loop.
 **Learning:** For files that are updated frequently and read by external processes (e.g., Conky sensor metrics), writing to them directly can result in the external process reading a partially written file, leading to corruption or display errors.
 **Prevention:** Implement atomic writes by writing data to a temporary file via `mktemp` and then moving it into place with `mv`. This ensures that the external process always reads a complete, valid state file.
+
 ## 2026-09-02 - [Fix Insecure Sudoers Argument Matching]
 **Vulnerability:** Complex argument matching in sudoers (`/etc/sudoers.d/conky-monitor`) via `Cmnd_Alias` to restrict `rkhunter` command arguments (`--update`, `--propupd`, `--check --sk`).
 **Learning:** Depending on `sudo`'s string matching for security boundaries can be risky and brittle against unexpected spaces or escaping techniques. It can also clutter the sudoers file making it hard to audit.
@@ -41,3 +42,8 @@
 **Vulnerability:** Unprivileged scripts attempting to delete sensitive files (e.g., `rkhunter_warnings.txt`) located in root-owned directories (like `/var/log`) using `rm -f`.
 **Learning:** File deletion via `rm` requires write permissions on the parent directory, not just the file itself. When an unprivileged user tries to `rm` a file in `/var/log`, the operation fails, leaving sensitive data (like rootkit warnings) exposed and undeleted.
 **Prevention:** To securely wipe sensitive data from user-owned files located in root-owned directories, unprivileged scripts must first truncate the file (e.g., `: > "$file"`) before attempting to delete it. This ensures the contents are wiped even if the file structure cannot be removed.
+
+## 2026-12-29 - [Fix Insecure HTTP Transmission]
+**Vulnerability:** Unencrypted network requests via HTTP (e.g., `curl -s ifconfig.me`).
+**Learning:** Making requests over unencrypted HTTP exposes data (like external IP queries or downloads) to interception or manipulation on the network layer via man-in-the-middle attacks.
+**Prevention:** Always use HTTPS (`https://`) instead of HTTP when making external requests to ensure encrypted data transmission and endpoint authenticity.

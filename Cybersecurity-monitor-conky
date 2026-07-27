@@ -297,7 +297,7 @@ conky.text = [[
 
 \${color magenta}------ Información de Red ------
 \${color white}IP Local: \${color cyan}\${execi 10 hostname -I | cut -d' ' -f1}
-\${color white}IP Pública: \${color cyan}\${execi 600 curl -s ifconfig.me}
+\${color white}IP Pública: \${color cyan}\${execi 600 curl -s https://ifconfig.me}
 \${color white}VPN: \${color yellow}\${execi 30 bash -c "if [ \$(nmcli -t -f type connection show --active | grep -ic vpn) -eq 0 ]; then echo 'inactiva'; else echo 'activa'; fi"}
 \${color white}Estado SSH: \${color yellow}\${execi 30 systemctl is-active ssh}
 \${color white}Conexiones Establecidas: \${color red}\${execi 10 netstat -an | grep ESTABLECIDO | wc -l}
