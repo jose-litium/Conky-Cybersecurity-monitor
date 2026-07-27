@@ -1028,11 +1028,7 @@ restore_system() {
 # Main Menu (GUI with dialog)
 ########################################
 
-main() {
-    # Perform initial dependency check
-    check_dependencies
-
-    # Welcome banner
+show_welcome_banner() {
     dialog --clear --title "Conky Cybersecurity Monitor v2.1" --msgbox \
 "This application installs, configures, and manages Conky with integrated security monitoring.
 
@@ -1047,7 +1043,9 @@ Features:
 Developed by jose-litium 2025
 GitHub: https://github.com/jose-litium
 LinkedIn: https://www.linkedin.com/in/josemmanueldiaz/" 20 75
+}
 
+run_main_menu() {
     while true; do
         local choice
         choice=$(dialog --clear --backtitle "Conky Cybersecurity Monitor v2.1" \
@@ -1105,6 +1103,17 @@ Stay secure! 🔒" 12 70
                 ;;
         esac
     done
+}
+
+main() {
+    # Perform initial dependency check
+    check_dependencies
+
+    # Welcome banner
+    show_welcome_banner
+
+    # Run main menu loop
+    run_main_menu
 }
 
 ########################################
