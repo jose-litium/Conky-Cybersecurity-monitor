@@ -72,18 +72,6 @@ dmsg() {
     dialog --clear --msgbox "$1" 10 60
 }
 
-# Menu dialog (returns the chosen option)
-dmenu() {
-    local title="$1"
-    shift
-    local -a options=("$@")
-    local choice
-    choice=$(dialog --clear --backtitle "Conky Cybersecurity Monitor" \
-        --title "$title" \
-        --menu "Choose an option:" 24 70 17 "${options[@]}" 2>&1 >/dev/tty) || return 1
-    echo "$choice"
-}
-
 ########################################
 # Logging Functions
 ########################################
