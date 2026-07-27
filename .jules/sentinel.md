@@ -41,3 +41,11 @@
 **Vulnerability:** Unprivileged scripts attempting to delete sensitive files (e.g., `rkhunter_warnings.txt`) located in root-owned directories (like `/var/log`) using `rm -f`.
 **Learning:** File deletion via `rm` requires write permissions on the parent directory, not just the file itself. When an unprivileged user tries to `rm` a file in `/var/log`, the operation fails, leaving sensitive data (like rootkit warnings) exposed and undeleted.
 **Prevention:** To securely wipe sensitive data from user-owned files located in root-owned directories, unprivileged scripts must first truncate the file (e.g., `: > "$file"`) before attempting to delete it. This ensures the contents are wiped even if the file structure cannot be removed.
+
+## 2026-07-27 - Fix Insecure Transmission of Data (HTTP vs HTTPS)
+
+**Vulnerability:** External requests for the public IP address were made using unencrypted HTTP (ifconfig.me instead of https://ifconfig.me). This allows network traffic interception (MITM), exposing the device's public IP address or potentially allowing injection of malicious responses.
+
+**Learning:** Always use HTTPS when transmitting data or fetching external information using tools like `curl`. Relying on HTTP leaves the communication open to eavesdropping and manipulation.
+
+**Prevention:** Default to HTTPS for all external API and web requests. Perform regular security reviews or static analysis to catch unencrypted `curl` or `wget` calls.
