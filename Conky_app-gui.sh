@@ -772,7 +772,7 @@ conky.text = [[
 
 \${color magenta}------ Network Information ------
 \${color white}Local IP: \${color cyan}\${execi 10 hostname -I 2>/dev/null | cut -d' ' -f1 || echo "N/A"}
-\${color white}Public IP: \${color cyan}\${execi 600 curl -s --max-time 10 ifconfig.me 2>/dev/null || echo "N/A"}
+\${color white}Public IP: \${color cyan}\${execi 600 curl -s --max-time 10 https://ifconfig.me 2>/dev/null || echo "N/A"}
 \${color white}VPN: \${execi 30 bash -c 'if ip link show 2>/dev/null | grep -Eiq "^(tun|tap|ppp)"; then echo "\${color yellow}Active\${color white}"; else echo "\${color yellow}Inactive\${color white}"; fi'}
 \${color white}SSH Status: \${color yellow}\${execi 30 systemctl is-active ssh 2>/dev/null || echo "inactive"}
 \${color white}Established Connections: \${color red}\${execi 10 netstat -an 2>/dev/null | grep -c ESTABLISHED || echo "0"}
