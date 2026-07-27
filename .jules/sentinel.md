@@ -36,3 +36,8 @@
 **Vulnerability:** Direct injection of the `$USER` variable into root-level bash scripts and sudoers configurations generated via unquoted heredocs.
 **Learning:** If an attacker can control the `$USER` environment variable, they could inject arbitrary commands into root-level bash scripts or add unauthorized rules to `/etc/sudoers.d/`, resulting in Command Injection or Privilege Escalation. Unquoted heredocs allow early expansion of environment variables before the script is fully written or executed.
 **Prevention:** To persist an unprivileged user's identity into root-level wrapper scripts dynamically generated via unquoted heredocs, the `$USER` variable must be strictly validated (e.g., using regex `^[a-zA-Z0-9_.-]+$`) and securely escaped (e.g., using `printf '%q'`) before injection.
+
+## 2026-12-28 - [Fix Insecure Deletion of Files in Root-Owned Directories]
+**Vulnerability:** Unprivileged scripts attempting to delete sensitive files (e.g., `rkhunter_warnings.txt`) located in root-owned directories (like `/var/log`) using `rm -f`.
+**Learning:** File deletion via `rm` requires write permissions on the parent directory, not just the file itself. When an unprivileged user tries to `rm` a file in `/var/log`, the operation fails, leaving sensitive data (like rootkit warnings) exposed and undeleted.
+**Prevention:** To securely wipe sensitive data from user-owned files located in root-owned directories, unprivileged scripts must first truncate the file (e.g., `: > "$file"`) before attempting to delete it. This ensures the contents are wiped even if the file structure cannot be removed.
