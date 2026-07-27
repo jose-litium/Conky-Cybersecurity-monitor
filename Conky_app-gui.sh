@@ -680,17 +680,7 @@ check_dependencies() {
 # Main Action Functions
 ########################################
 
-install_conky() {
-    if ! dconfirm "Proceed with Conky installation and configuration?"; then
-        dmsg "Installation canceled by user."
-        log "Installation canceled by user"
-        return 1
-    fi
-    
-    clear_log_file
-    log "Starting Conky installation and configuration..."
-    check_user_systemd
-    
+install_dependencies() {
     echo -e "${BLUE}Updating package lists...${NC}"
     if [[ -z "$APT_HAS_UPDATED" ]]; then
         sudo apt update
@@ -709,10 +699,9 @@ install_conky() {
     done
     
     log "Installed $installed_count of ${#apps[@]} required packages"
+}
 
-    configure_sensors
-    create_rkhunter_scan_script
-
+configure_rkhunter_permissions() {
     echo -e "${BLUE}Adjusting permissions for RKHunter logs...${NC}"
     if [[ -f /var/log/rkhunter.log ]]; then
         sudo chmod 644 /var/log/rkhunter.log 2>/dev/null || true
@@ -720,13 +709,9 @@ install_conky() {
     sudo touch /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt /var/log/rkhunter_status.txt 2>/dev/null || true
     sudo chown "${USER}:${USER}" /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt /var/log/rkhunter_status.txt 2>/dev/null || true
     sudo chmod 644 /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt /var/log/rkhunter_status.txt 2>/dev/null || true
+}
 
-    echo -e "${BLUE}Configuring sudoers for Conky commands...${NC}"
-    if ! setup_sudoers; then
-        dmsg "WARNING: Sudoers configuration failed. Some features may require manual password entry."
-        log "WARNING: Sudoers setup failed"
-    fi
-
+create_conky_config() {
     mkdir -p ~/.config/conky
     local username="$USER"
     local home_dir="$HOME"
@@ -791,6 +776,10 @@ conky.text = [[
 \${color white}\${execi 5 ps -eo pid,comm,%cpu --sort=-%cpu 2>/dev/null | head -n 6 | tail -n 5}
 ]];
 EOL
+}
+
+create_user_systemd_service() {
+    local home_dir="$HOME"
 
     # Create user systemd service for Conky
     mkdir -p ~/.config/systemd/user
@@ -820,6 +809,34 @@ EOL
         log "WARNING: Could not start conky.service (user systemd may not be active)"
         dmsg "Conky installed. Start manually with: systemctl --user start conky.service"
     }
+}
+
+install_conky() {
+    if ! dconfirm "Proceed with Conky installation and configuration?"; then
+        dmsg "Installation canceled by user."
+        log "Installation canceled by user"
+        return 1
+    fi
+
+    clear_log_file
+    log "Starting Conky installation and configuration..."
+    check_user_systemd
+
+    install_dependencies
+
+    configure_sensors
+    create_rkhunter_scan_script
+
+    configure_rkhunter_permissions
+
+    echo -e "${BLUE}Configuring sudoers for Conky commands...${NC}"
+    if ! setup_sudoers; then
+        dmsg "WARNING: Sudoers configuration failed. Some features may require manual password entry."
+        log "WARNING: Sudoers setup failed"
+    fi
+
+    create_conky_config
+    create_user_systemd_service
 
     dmsg "Conky installation completed."
     log "Conky installed and configured."
