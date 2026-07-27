@@ -220,16 +220,10 @@ remove_rkhunter_service() {
 }
 
 # ------------------------------------------------------------------------------
-# Función: install_conky
-#   Instala conky-all y sus dependencias, configura RKHunter,
-#   crea un servicio systemd a nivel de usuario para Conky y lo inicia.
+# Función: install_conky_packages
+#   Instala los paquetes necesarios para Conky.
 # ------------------------------------------------------------------------------
-install_conky() {
-    if ! dconfirm "¿Proceder con la instalación y configuración de Conky?"; then
-        dmsg "Instalación abortada por el usuario."
-        return
-    fi
-    check_user_systemd
+install_conky_packages() {
     echo -e "${BLUE}Actualizando listas de paquetes...${NC}"
     sudo apt update
 
@@ -238,13 +232,13 @@ install_conky() {
     for APP in "${APPS[@]}"; do
         check_install "$APP"
     done
+}
 
-    # Configurar lm-sensors
-    configure_sensors
-
-    # Crear el script auxiliar de RKHunter
-    create_rkhunter_scan_script
-
+# ------------------------------------------------------------------------------
+# Función: configure_rkhunter_permissions
+#   Configura los permisos para RKHunter y agrega a sudoers.
+# ------------------------------------------------------------------------------
+configure_rkhunter_permissions() {
     echo -e "${BLUE}Configurando permisos para RKHunter...${NC}"
     sudo chmod +r /var/log/rkhunter.log
     sudo usermod -aG adm "$(whoami)"
@@ -253,7 +247,13 @@ install_conky() {
     echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/rkhunter --update, /usr/bin/rkhunter --propupd, /usr/bin/rkhunter --check --sk" \
          | sudo tee /etc/sudoers.d/conky > /dev/null
     sudo chmod 0440 /etc/sudoers.d/conky
+}
 
+# ------------------------------------------------------------------------------
+# Función: create_conky_config
+#   Crea el archivo de configuración conky.conf.
+# ------------------------------------------------------------------------------
+create_conky_config() {
     mkdir -p ~/.config/conky
 
     USERNAME="$USER"
@@ -316,8 +316,13 @@ conky.text = [[
 \${color white}\${execi 5 ps -eo pid,comm,%cpu --sort=-%cpu | head -n 6 | tail -n 5}
 ]];
 EOL
+}
 
-    # Crear servicio systemd a nivel de usuario para Conky
+# ------------------------------------------------------------------------------
+# Función: setup_conky_service
+#   Crea el servicio systemd a nivel de usuario para Conky y lo inicia.
+# ------------------------------------------------------------------------------
+setup_conky_service() {
     mkdir -p ~/.config/systemd/user
     echo -e "${BLUE}Creando servicio systemd para Conky...${NC}"
     cat <<EOL > ~/.config/systemd/user/conky.service
@@ -338,6 +343,33 @@ EOL
     systemctl --user daemon-reload
     systemctl --user enable conky.service
     systemctl --user start conky.service
+}
+
+# ------------------------------------------------------------------------------
+# Función: install_conky
+#   Instala conky-all y sus dependencias, configura RKHunter,
+#   crea un servicio systemd a nivel de usuario para Conky y lo inicia.
+# ------------------------------------------------------------------------------
+install_conky() {
+    if ! dconfirm "¿Proceder con la instalación y configuración de Conky?"; then
+        dmsg "Instalación abortada por el usuario."
+        return
+    fi
+    check_user_systemd
+
+    install_conky_packages
+
+    # Configurar lm-sensors
+    configure_sensors
+
+    # Crear el script auxiliar de RKHunter
+    create_rkhunter_scan_script
+
+    configure_rkhunter_permissions
+
+    create_conky_config
+
+    setup_conky_service
 
     echo -e "${GREEN}Instalación de Conky completa.${NC}"
     echo -e "${GREEN}Conky se está ejecutando bajo tu sesión systemd de usuario.${NC}"
