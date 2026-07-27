@@ -41,3 +41,7 @@
 **Vulnerability:** Unprivileged scripts attempting to delete sensitive files (e.g., `rkhunter_warnings.txt`) located in root-owned directories (like `/var/log`) using `rm -f`.
 **Learning:** File deletion via `rm` requires write permissions on the parent directory, not just the file itself. When an unprivileged user tries to `rm` a file in `/var/log`, the operation fails, leaving sensitive data (like rootkit warnings) exposed and undeleted.
 **Prevention:** To securely wipe sensitive data from user-owned files located in root-owned directories, unprivileged scripts must first truncate the file (e.g., `: > "$file"`) before attempting to delete it. This ensures the contents are wiped even if the file structure cannot be removed.
+## 2024-05-24 - Insecure HTTP Request to ifconfig.me
+**Vulnerability:** Insecure transmission of data (HTTP instead of HTTPS) in Conky scripts fetching the public IP.
+**Learning:** Always use HTTPS when making external requests to third-party services to prevent unencrypted transmission of data.
+**Prevention:** Hardcode `https://` in `curl` commands and similar tools when querying external services.
