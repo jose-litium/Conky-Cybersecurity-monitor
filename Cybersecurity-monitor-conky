@@ -98,13 +98,73 @@ create_rkhunter_scan_script() {
     cat <<EOF > "$SCRIPT"
 #!/usr/bin/env bash
 TMP_RESULT=\$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")
-sudo rkhunter --update > /dev/null 2>&1 && \\
-sudo rkhunter --propupd > /dev/null 2>&1 && \\
-sudo rkhunter --check --sk > "\$TMP_RESULT" 2>/dev/null && \\
+sudo /usr/local/bin/conky-rkhunter-wrapper.sh --update > /dev/null 2>&1 && \\
+sudo /usr/local/bin/conky-rkhunter-wrapper.sh --propupd > /dev/null 2>&1 && \\
+sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "\$TMP_RESULT" 2>/dev/null && \\
 grep -i "warning" "\$TMP_RESULT" > "/var/log/rkhunter_warnings.txt"
 rm -f "\$TMP_RESULT"
 EOF
     chmod +x "$SCRIPT"
+}
+
+setup_sudoers() {
+    # Validate and escape USER to prevent Command Injection / Privilege Escalation
+    if [[ ! "$USER" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+        echo -e "${RED}ERROR: Invalid USER variable format.${NC}"
+        return 1
+    fi
+    local safe_user
+    safe_user="$(printf '%q' "$USER")"
+
+    local sudoers_file="/etc/sudoers.d/conky"
+    local wrapper_script="/usr/local/bin/conky-rkhunter-wrapper.sh"
+
+    # Create wrapper script for rkhunter
+    sudo tee "$wrapper_script" > /dev/null <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Secure wrapper for rkhunter to prevent complex argument matching in sudoers
+case "${1:-}" in
+    --update)
+        exec /usr/bin/rkhunter --update
+        ;;
+    --propupd)
+        exec /usr/bin/rkhunter --propupd
+        ;;
+    --check)
+        if [[ "${2:-}" == "--sk" && -z "${3:-}" ]]; then
+            exec /usr/bin/rkhunter --check --sk
+        else
+            echo "Invalid arguments" >&2
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Invalid arguments" >&2
+        exit 1
+        ;;
+esac
+EOF
+    sudo chmod 755 "$wrapper_script"
+
+    # Create secure sudoers entry with minimal required permissions
+    sudo tee "$sudoers_file" > /dev/null <<EOF
+# Conky Cybersecurity Monitor - Minimal sudo permissions
+
+# Allow user to run the specific wrapper script without password
+${safe_user} ALL=(ALL) NOPASSWD: /usr/local/bin/conky-rkhunter-wrapper.sh
+EOF
+
+    # Set secure permissions
+    sudo chmod 0440 "$sudoers_file"
+
+    # Validate sudoers syntax before applying
+    if ! sudo visudo -c -f "$sudoers_file" &>/dev/null; then
+        echo -e "${RED}ERROR: Sudoers syntax validation failed. Rolling back.${NC}"
+        sudo rm -f "$sudoers_file"
+        return 1
+    fi
 }
 
 # ------------------------------------------------------------------------------
@@ -250,9 +310,9 @@ install_conky() {
     sudo usermod -aG adm "$(whoami)"
 
     echo -e "${BLUE}Configurando sudoers para comandos de Conky...${NC}"
-    echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/rkhunter --update, /usr/bin/rkhunter --propupd, /usr/bin/rkhunter --check --sk" \
-         | sudo tee /etc/sudoers.d/conky > /dev/null
-    sudo chmod 0440 /etc/sudoers.d/conky
+    if ! setup_sudoers; then
+        dmsg "WARNING: Sudoers configuration failed. Some features may require manual password entry."
+    fi
 
     mkdir -p ~/.config/conky
 
@@ -435,11 +495,11 @@ restart_conky() {
 check_rkhunter() {
     echo -e "${BLUE}Ejecutando escaneo con RKHunter...${NC}"
     local WARN_LOG="/var/log/rkhunter_warnings.txt"
-    sudo rkhunter --update > /dev/null 2>&1
-    sudo rkhunter --propupd > /dev/null 2>&1
+    sudo /usr/local/bin/conky-rkhunter-wrapper.sh --update > /dev/null 2>&1
+    sudo /usr/local/bin/conky-rkhunter-wrapper.sh --propupd > /dev/null 2>&1
     local TMP_RESULT
     TMP_RESULT=$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")
-    sudo rkhunter --check --sk > "$TMP_RESULT" 2>/dev/null
+    sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "$TMP_RESULT" 2>/dev/null
     grep -i "warning" "$TMP_RESULT" > "$WARN_LOG"
     rm -f "$TMP_RESULT"
     if [ -s "$WARN_LOG" ]; then
