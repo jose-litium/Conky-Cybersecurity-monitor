@@ -84,11 +84,6 @@ clear_log_file() {
     : > "$LOGFILE"
 }
 
-run_cmd() {
-    log "Running: $*"
-    "$@" >> "$LOGFILE" 2>&1
-}
-
 ########################################
 # Sudoers Configuration (Hardened)
 ########################################
