@@ -757,7 +757,7 @@ conky.config = {
 };
 
 conky.text = [[
-\${exec $home_dir/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
+\${execi 21600 $home_dir/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
 \${color yellow}\${time %H:%M:%S}      Vietnam (GMT+7)
 \${color cyan}\${execi 10 TZ='Europe/Madrid' date '+%H:%M:%S'}      Madrid (GMT+1)
 \${color green}\${execi 10 TZ='Australia/Sydney' date '+%H:%M:%S'}      Sydney (GMT+10)
