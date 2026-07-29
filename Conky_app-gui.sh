@@ -698,11 +698,7 @@ install_conky() {
     
     check_install "${apps[@]}"
 
-    for pkg in "${apps[@]}"; do
-        if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q " ok installed"; then
-            ((installed_count++)) || true
-        fi
-    done
+    installed_count=$(dpkg-query -W -f='${Status}\n' "${apps[@]}" 2>/dev/null | grep -c " ok installed" || true)
     
     log "Installed $installed_count of ${#apps[@]} required packages"
 
