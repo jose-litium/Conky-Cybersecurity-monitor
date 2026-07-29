@@ -491,13 +491,9 @@ delete_temporaries() {
         "$INSTALL_DIR/rkhunter_warnings_"*".txt"
     )
     
-    for file in "${temp_files[@]}"; do
-        # Securely truncate files that cannot be removed (e.g. in /var/log)
-        if [[ -f "$file" && -w "$file" ]]; then
-            : > "$file"
-        fi
-        rm -f "$file" 2>/dev/null || true
-    done
+    # Securely truncate files that cannot be removed (e.g. in /var/log)
+    truncate -s 0 -c "${temp_files[@]}" 2>/dev/null || true
+    rm -f "${temp_files[@]}" 2>/dev/null || true
     
     dmsg "Temporary files deleted securely."
     log "Temporary files cleaned up."
