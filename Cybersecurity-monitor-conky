@@ -342,7 +342,7 @@ conky.config = {
 };
 
 conky.text = [[
-\${exec /home/${USERNAME}/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
+\${execi 21600 /home/${USERNAME}/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
 \${color yellow}\${time %H:%M:%S}       Vietnam (GMT+7)
 \${color cyan}\${execi 10 TZ='Europe/Madrid' date '+%H:%M:%S'}       Madrid (GMT+1)
 \${color green}\${execi 10 TZ='Australia/Sydney' date '+%H:%M:%S'}       Sydney (GMT+10)
@@ -357,7 +357,7 @@ conky.text = [[
 
 \${color magenta}------ Información de Red ------
 \${color white}IP Local: \${color cyan}\${execi 10 hostname -I | cut -d' ' -f1}
-\${color white}IP Pública: \${color cyan}\${execi 600 curl -s ifconfig.me}
+\${color white}IP Pública: \${color cyan}\${execi 600 curl -s https://ifconfig.me}
 \${color white}VPN: \${color yellow}\${execi 30 bash -c "if [ \$(nmcli -t -f type connection show --active | grep -ic vpn) -eq 0 ]; then echo 'inactiva'; else echo 'activa'; fi"}
 \${color white}Estado SSH: \${color yellow}\${execi 30 systemctl is-active ssh}
 \${color white}Conexiones Establecidas: \${color red}\${execi 10 netstat -an | grep ESTABLECIDO | wc -l}
@@ -508,7 +508,7 @@ check_rkhunter() {
          dmsg "Tienes ${count} alerta(s).\nVer alertas con: cat $WARN_LOG"
     else
          dmsg "No se detectaron alertas."
-         rm -f "$WARN_LOG"
+         : > "$WARN_LOG"; rm -f "$WARN_LOG" 2>/dev/null || true
     fi
 }
 
