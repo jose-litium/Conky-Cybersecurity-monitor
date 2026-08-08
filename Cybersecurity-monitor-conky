@@ -342,7 +342,7 @@ conky.config = {
 };
 
 conky.text = [[
-\${exec /home/${USERNAME}/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
+\${execi 21600 /home/${USERNAME}/.local/conky_app/rkhunter_scan.sh > /dev/null 2>&1}
 \${color yellow}\${time %H:%M:%S}       Vietnam (GMT+7)
 \${color cyan}\${execi 10 TZ='Europe/Madrid' date '+%H:%M:%S'}       Madrid (GMT+1)
 \${color green}\${execi 10 TZ='Australia/Sydney' date '+%H:%M:%S'}       Sydney (GMT+10)
@@ -499,7 +499,7 @@ check_rkhunter() {
     sudo /usr/local/bin/conky-rkhunter-wrapper.sh --propupd > /dev/null 2>&1
     local TMP_RESULT
     TMP_RESULT=$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")
-    sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "$TMP_RESULT" 2>/dev/null
+    sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk | tee "$TMP_RESULT" > /dev/null 2>&1
     grep -i "warning" "$TMP_RESULT" > "$WARN_LOG"
     rm -f "$TMP_RESULT"
     if [ -s "$WARN_LOG" ]; then
@@ -508,7 +508,10 @@ check_rkhunter() {
          dmsg "Tienes ${count} alerta(s).\nVer alertas con: cat $WARN_LOG"
     else
          dmsg "No se detectaron alertas."
-         rm -f "$WARN_LOG"
+         if [[ -f "$WARN_LOG" && -w "$WARN_LOG" ]]; then
+             : > "$WARN_LOG" 2>/dev/null || true
+         fi
+         rm -f "$WARN_LOG" 2>/dev/null || true
     fi
 }
 
