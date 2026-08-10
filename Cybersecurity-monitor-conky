@@ -508,7 +508,11 @@ check_rkhunter() {
          dmsg "Tienes ${count} alerta(s).\nVer alertas con: cat $WARN_LOG"
     else
          dmsg "No se detectaron alertas."
-         rm -f "$WARN_LOG"
+         # Securely truncate file that cannot be removed
+         if [[ -f "$WARN_LOG" && -w "$WARN_LOG" ]]; then
+             : > "$WARN_LOG"
+         fi
+         rm -f "$WARN_LOG" 2>/dev/null || true
     fi
 }
 
