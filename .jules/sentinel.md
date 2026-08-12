@@ -38,9 +38,9 @@
 **Prevention:** To persist an unprivileged user's identity into root-level wrapper scripts dynamically generated via unquoted heredocs, the `$USER` variable must be strictly validated (e.g., using regex `^[a-zA-Z0-9_.-]+$`) and securely escaped (e.g., using `printf '%q'`) before injection.
 
 ## 2026-12-28 - [Fix Insecure Deletion of Files in Root-Owned Directories]
-**Vulnerability:** Unprivileged scripts attempting to delete sensitive files (e.g., `rkhunter_warnings.txt`) located in root-owned directories (like `/var/log`) using `rm -f`.
-**Learning:** File deletion via `rm` requires write permissions on the parent directory, not just the file itself. When an unprivileged user tries to `rm` a file in `/var/log`, the operation fails, leaving sensitive data (like rootkit warnings) exposed and undeleted.
-**Prevention:** To securely wipe sensitive data from user-owned files located in root-owned directories, unprivileged scripts must first truncate the file (e.g., `: > "$file"`) before attempting to delete it. This ensures the contents are wiped even if the file structure cannot be removed.
+**Vulnerability:** Unprivileged scripts attempting to delete sensitive files (e.g., `rkhunter_warnings.txt`) located in root-owned directories (like `/var/log`) using `rm -f`. Shell redirection truncation (`: > "$file"`) inside conditionals introduces TOCTOU vulnerabilities and symlink attacks.
+**Learning:** File deletion via `rm` requires write permissions on the parent directory. When an unprivileged user tries to `rm` a file in `/var/log`, it fails. Using `if [[ -f $file ]]; then : > $file; fi` to wipe it leaves a Time-of-Check to Time-of-Use window where an attacker can swap the file for a symlink, modifying arbitrary files or leaving sensitive data exposed.
+**Prevention:** To securely wipe sensitive data from user-owned files in root-owned directories, avoid conditionals and shell redirection. Use `truncate -s 0 -c "$file" 2>/dev/null || true` before attempting to delete it. The `-c` flag prevents creating files if they don't exist, and `truncate` is safer against TOCTOU vulnerabilities.
 
 ## 2026-12-29 - [Fix Insecure Sudoers Rule Generation]
 **Vulnerability:** In `Cybersecurity-monitor-conky`, `echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/rkhunter --update, ..." | sudo tee /etc/sudoers.d/conky` was used to create sudoers rules with complex arguments.
