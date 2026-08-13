@@ -81,7 +81,7 @@ log() {
 }
 
 clear_log_file() {
-    : > "$LOGFILE"
+    truncate -s 0 -c "$LOGFILE" 2>/dev/null || true
 }
 
 ########################################
@@ -940,9 +940,7 @@ check_rkhunter() {
                 dmsg "Scan complete: No alerts detected."
                 log "RKHunter manual scan: Clean"
                 # Securely truncate file that cannot be removed
-                if [[ -f "$warn_log" && -w "$warn_log" ]]; then
-                    : > "$warn_log"
-                fi
+                truncate -s 0 -c "$warn_log" 2>/dev/null || true
                 rm -f "$warn_log" 2>/dev/null || true
             fi
         else
