@@ -50,3 +50,8 @@
 **Vulnerability:** Conky configuration used `exec` to run a heavy `rkhunter` scan script every second, causing severe resource exhaustion (DoS). Additionally, the scan wrapper scripts chained `rkhunter` and `grep` with `&&`, meaning if the scan found rootkits (and returned non-zero), the warning log was never updated, silently swallowing alerts. The `temp_monitor.sh` script also had an uninitialized `INSTALL_DIR` variable due to unexpanded heredocs.
 **Learning:** When chaining execution commands for security scanners (like `rkhunter`) and their subsequent logging steps in Bash, avoid using `&&`. Scanners often return non-zero exit codes when threats are found; `&&` will short-circuit and skip the logging step, silently masking the alert. Furthermore, when writing scripts via single-quoted literal heredocs, ensure critical variables are explicitly defined within the heredoc body, as they will not inherit from the parent script.
 **Prevention:** Use `;` or `|| true` for scanner execution to ensure logging occurs regardless of the scan's exit status. Use `execi <interval>` (e.g., `execi 21600`) in Conky configurations instead of `exec` to prevent resource thrashing. Explicitly define necessary path variables within unexpanded heredocs.
+
+## 2026-12-30 - [Fix Insecure Unencrypted Communications]
+**Vulnerability:** Fetching public IP over unencrypted HTTP (e.g., using `curl ifconfig.me`).
+**Learning:** Using HTTP for external requests leaves data vulnerable to interception and MITM attacks, even for simple IP checks.
+**Prevention:** Always use HTTPS (e.g., `https://ifconfig.me`) for external network requests to ensure secure data transmission.

@@ -248,22 +248,22 @@ sudo /usr/local/bin/conky-rkhunter-wrapper.sh --update >/dev/null 2>&1 || true
 sudo /usr/local/bin/conky-rkhunter-wrapper.sh --propupd >/dev/null 2>&1 || true
 
 # Run check and capture output
-if sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "$RESULT_FILE" 2>/dev/null; then
-    # Extract only warning lines for Conky display
-    grep -iE "(warning|alert|suspect)" "$RESULT_FILE" > "$WARN_FILE" 2>/dev/null || true
-    
-    # Create comparison file for change detection
-    if [[ -f "/var/log/rkhunter_warnings_prev.txt" ]]; then
-        if ! cmp -s "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt"; then
-            cp "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt"
-            echo "CHANGED" > "/var/log/rkhunter_status.txt"
-        else
-            echo "UNCHANGED" > "/var/log/rkhunter_status.txt"
-        fi
+sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "$RESULT_FILE" 2>/dev/null || true
+
+# Extract only warning lines for Conky display
+grep -iE "(warning|alert|suspect)" "$RESULT_FILE" > "$WARN_FILE" 2>/dev/null || true
+
+# Create comparison file for change detection
+if [[ -f "/var/log/rkhunter_warnings_prev.txt" ]]; then
+    if ! cmp -s "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt"; then
+        cp "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt"
+        echo "CHANGED" > "/var/log/rkhunter_status.txt"
     else
-        cp "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt" 2>/dev/null || true
-        echo "INITIAL" > "/var/log/rkhunter_status.txt"
+        echo "UNCHANGED" > "/var/log/rkhunter_status.txt"
     fi
+else
+    cp "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt" 2>/dev/null || true
+    echo "INITIAL" > "/var/log/rkhunter_status.txt"
 fi
 
 # Ensure file exists even if empty (for Conky to read)
@@ -732,7 +732,7 @@ conky.text = [[
 
 \${color magenta}------ Network Information ------
 \${color white}Local IP: \${color cyan}\${execi 10 hostname -I 2>/dev/null | cut -d' ' -f1 || echo "N/A"}
-\${color white}Public IP: \${color cyan}\${execi 600 curl -s --max-time 10 ifconfig.me 2>/dev/null || echo "N/A"}
+\${color white}Public IP: \${color cyan}\${execi 600 curl -s --max-time 10 https://ifconfig.me 2>/dev/null || echo "N/A"}
 \${color white}VPN: \${execi 30 bash -c 'if ip link show 2>/dev/null | grep -Eiq "^(tun|tap|ppp)"; then echo "\${color yellow}Active\${color white}"; else echo "\${color yellow}Inactive\${color white}"; fi'}
 \${color white}SSH Status: \${color yellow}\${execi 30 systemctl is-active ssh 2>/dev/null || echo "inactive"}
 \${color white}Established Connections: \${color red}\${execi 10 netstat -an 2>/dev/null | grep -c ESTABLISHED || echo "0"}
@@ -927,26 +927,21 @@ check_rkhunter() {
         local result_file
         result_file="$(mktemp)"
         
-        if sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "$result_file" 2>/dev/null; then
-            grep -iE "(warning|alert|suspect)" "$result_file" > "$warn_log" 2>/dev/null || true
-            rm -f "$result_file"
-            
-            if [[ -s "$warn_log" ]]; then
-                local count
-                count="$(wc -l < "$warn_log")"
-                dmsg "Scan complete: $count alert(s) found.\nView with option 12 or: cat $warn_log"
-                log "RKHunter manual scan: $count warnings found"
-            else
-                dmsg "Scan complete: No alerts detected."
-                log "RKHunter manual scan: Clean"
-                # Securely truncate file that cannot be removed
-                truncate -s 0 -c "$warn_log" 2>/dev/null || true
-                rm -f "$warn_log" 2>/dev/null || true
-            fi
+        sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "$result_file" 2>/dev/null || true
+        grep -iE "(warning|alert|suspect)" "$result_file" > "$warn_log" 2>/dev/null || true
+        rm -f "$result_file"
+
+        if [[ -s "$warn_log" ]]; then
+            local count
+            count="$(wc -l < "$warn_log")"
+            dmsg "Scan complete: $count alert(s) found.\nView with option 12 or: cat $warn_log"
+            log "RKHunter manual scan: $count warnings found"
         else
-            dmsg "RKHunter check failed. Check logs for details."
-            log "ERROR: RKHunter check command failed"
-            return 1
+            dmsg "Scan complete: No alerts detected."
+            log "RKHunter manual scan: Clean"
+            # Securely truncate file that cannot be removed
+            truncate -s 0 -c "$warn_log" 2>/dev/null || true
+            rm -f "$warn_log" 2>/dev/null || true
         fi
     else
         dmsg "RKHunter update failed. Ensure you have internet connectivity."
