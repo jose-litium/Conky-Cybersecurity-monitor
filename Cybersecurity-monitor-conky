@@ -108,13 +108,11 @@ EOF
 }
 
 setup_sudoers() {
-    # Validate and escape USER to prevent Command Injection / Privilege Escalation
+    # Validate USER to prevent Command Injection / Privilege Escalation
     if [[ ! "$USER" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
         echo -e "${RED}ERROR: Invalid USER variable format.${NC}"
         return 1
     fi
-    local safe_user
-    safe_user="$(printf '%q' "$USER")"
 
     local sudoers_file="/etc/sudoers.d/conky"
     local wrapper_script="/usr/local/bin/conky-rkhunter-wrapper.sh"
@@ -153,7 +151,7 @@ EOF
 # Conky Cybersecurity Monitor - Minimal sudo permissions
 
 # Allow user to run the specific wrapper script without password
-${safe_user} ALL=(ALL) NOPASSWD: /usr/local/bin/conky-rkhunter-wrapper.sh
+$USER ALL=(ALL) NOPASSWD: /usr/local/bin/conky-rkhunter-wrapper.sh
 EOF
 
     # Set secure permissions
@@ -241,8 +239,6 @@ install_rkhunter_service() {
         echo -e "${RED}ERROR: Invalid USER variable format.${NC}"
         return 1
     fi
-    local safe_user
-    safe_user="$(printf '%q' "$USER")"
 
     sudo tee /etc/systemd/system/rkhunter-auto.service > /dev/null <<EOL
 [Unit]
@@ -250,7 +246,7 @@ Description=Escaneo Automático con RKHunter
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'TMP_RESULT=\$\$(mktemp); rkhunter --update > /dev/null 2>&1 || true; rkhunter --propupd > /dev/null 2>&1 || true; rkhunter --check --sk > "\$\$TMP_RESULT" 2>/dev/null || true; grep -i "warning" "\$\$TMP_RESULT" > /var/log/rkhunter_warnings.txt || true; chown ${safe_user}:${safe_user} /var/log/rkhunter_warnings.txt 2>/dev/null; chmod 644 /var/log/rkhunter_warnings.txt 2>/dev/null; rm -f "\$\$TMP_RESULT"'
+ExecStart=/bin/bash -c 'TMP_RESULT=\$\$(mktemp); rkhunter --update > /dev/null 2>&1 || true; rkhunter --propupd > /dev/null 2>&1 || true; rkhunter --check --sk > "\$\$TMP_RESULT" 2>/dev/null || true; grep -i "warning" "\$\$TMP_RESULT" > /var/log/rkhunter_warnings.txt || true; chown $USER:$USER /var/log/rkhunter_warnings.txt 2>/dev/null; chmod 644 /var/log/rkhunter_warnings.txt 2>/dev/null; rm -f "\$\$TMP_RESULT"'
 RemainAfterExit=yes
 EOL
 
