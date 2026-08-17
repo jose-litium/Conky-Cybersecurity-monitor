@@ -98,11 +98,16 @@ create_rkhunter_scan_script() {
     cat <<EOF > "$SCRIPT"
 #!/usr/bin/env bash
 TMP_RESULT=\$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")
+
+cleanup() {
+    rm -f "\$TMP_RESULT" 2>/dev/null || true
+}
+trap cleanup EXIT
+
 sudo /usr/local/bin/conky-rkhunter-wrapper.sh --update > /dev/null 2>&1 || true
 sudo /usr/local/bin/conky-rkhunter-wrapper.sh --propupd > /dev/null 2>&1 || true
 sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "\$TMP_RESULT" 2>/dev/null || true
 grep -i "warning" "\$TMP_RESULT" > "/var/log/rkhunter_warnings.txt" || true
-rm -f "\$TMP_RESULT"
 EOF
     chmod +x "$SCRIPT"
 }
