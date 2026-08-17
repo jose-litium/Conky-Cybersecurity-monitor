@@ -76,16 +76,32 @@ check_user_systemd() {
 #   Verifica si un paquete está instalado; si no, pregunta si se desea instalar.
 # ------------------------------------------------------------------------------
 check_install() {
-    local pkg="$1"
-    if dpkg -s "$pkg" &>/dev/null; then
-        echo -e "${GREEN}$pkg ya está instalado.${NC}"
-    else
-        echo -e "${CYAN}$pkg no está instalado.${NC}"
-        if dconfirm "¿Deseas instalar $pkg?"; then
-            sudo apt install -y "$pkg"
+    local pkgs=("$@")
+    local missing_pkgs=()
+    local installed_pkgs
+
+    # Use dpkg-query to efficiently check all packages at once
+    installed_pkgs=$(dpkg-query -W -f='${Package} ${Status}\n' "${pkgs[@]}" 2>/dev/null | awk '/ ok installed$/ {print $1}')
+    local installed_str=" ${installed_pkgs//$'\n'/ } "
+
+    for pkg in "${pkgs[@]}"; do
+        if [[ "$installed_str" == *" $pkg "* ]]; then
+            echo -e "${GREEN}$pkg ya está instalado.${NC}"
         else
-            echo -e "${RED}Omitiendo la instalación de $pkg. Esto puede afectar la funcionalidad.${NC}"
+            echo -e "${CYAN}$pkg no está instalado.${NC}"
+            missing_pkgs+=("$pkg")
         fi
+    done
+
+    if [[ ${#missing_pkgs[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    local pkg_list="${missing_pkgs[*]}"
+    if dconfirm "¿Deseas instalar los siguientes paquetes?\n$pkg_list"; then
+        sudo apt install -y "${missing_pkgs[@]}"
+    else
+        echo -e "${RED}Omitiendo la instalación de $pkg_list. Esto puede afectar la funcionalidad.${NC}"
     fi
 }
 
@@ -304,9 +320,7 @@ install_conky() {
 
     # Paquetes requeridos para la funcionalidad de Conky (incluyendo lm-sensors)
     local APPS=("conky-all" "curl" "net-tools" "lsof" "xdg-utils" "rkhunter" "lm-sensors" "nmap" "upower")
-    for APP in "${APPS[@]}"; do
-        check_install "$APP"
-    done
+    check_install "${APPS[@]}"
 
     # Configurar lm-sensors
     configure_sensors
