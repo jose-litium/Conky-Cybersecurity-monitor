@@ -523,13 +523,7 @@ restart_conky() {
 check_rkhunter() {
     echo -e "${BLUE}Ejecutando escaneo con RKHunter...${NC}"
     local WARN_LOG="/var/log/rkhunter_warnings.txt"
-    sudo /usr/local/bin/conky-rkhunter-wrapper.sh --update > /dev/null 2>&1 || true
-    sudo /usr/local/bin/conky-rkhunter-wrapper.sh --propupd > /dev/null 2>&1 || true
-    local TMP_RESULT
-    TMP_RESULT=$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")
-    sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "$TMP_RESULT" 2>/dev/null || true
-    grep -i "warning" "$TMP_RESULT" > "$WARN_LOG" || true
-    rm -f "$TMP_RESULT"
+    "$INSTALL_DIR/rkhunter_scan.sh"
     if [ -s "$WARN_LOG" ]; then
          local count
          count=$(wc -l < "$WARN_LOG")
