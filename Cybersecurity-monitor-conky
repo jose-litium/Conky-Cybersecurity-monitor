@@ -174,7 +174,7 @@ EOF
 # Conky Cybersecurity Monitor - Minimal sudo permissions
 
 # Allow user to run the specific wrapper script without password
-${safe_user} ALL=(ALL) NOPASSWD: /usr/local/bin/conky-rkhunter-wrapper.sh
+${safe_user} ALL=(root) NOPASSWD: /usr/local/bin/conky-rkhunter-wrapper.sh
 EOF
 
     # Set secure permissions
