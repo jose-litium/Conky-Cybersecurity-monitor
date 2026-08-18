@@ -167,8 +167,15 @@ check_install() {
     local pkgs=("$@")
     local missing_pkgs=()
 
+    if [[ ${#pkgs[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    local query_output
+    query_output=$(dpkg-query -W -f='${binary:Package} ${Status}\n' "${pkgs[@]}" 2>/dev/null || true)
+
     for pkg in "${pkgs[@]}"; do
-        if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q " ok installed"; then
+        if [[ "$query_output" =~ (^|$'\n')"${pkg} "[^$'\n']*"ok installed" ]]; then
             log "$pkg is already installed."
         else
             log "$pkg is not installed."
