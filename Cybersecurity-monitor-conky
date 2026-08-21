@@ -265,15 +265,49 @@ install_rkhunter_service() {
     local safe_user
     safe_user="$(printf '%q' "$USER")"
 
-    sudo tee /etc/systemd/system/rkhunter-auto.service > /dev/null <<EOL
+    sudo tee /etc/systemd/system/rkhunter-auto.service > /dev/null <<'EOL'
 [Unit]
 Description=Escaneo Automático con RKHunter
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'TMP_RESULT=\$\$(mktemp); rkhunter --update > /dev/null 2>&1 || true; rkhunter --propupd > /dev/null 2>&1 || true; rkhunter --check --sk > "\$\$TMP_RESULT" 2>/dev/null || true; grep -i "warning" "\$\$TMP_RESULT" > /var/log/rkhunter_warnings.txt || true; chown ${safe_user}:${safe_user} /var/log/rkhunter_warnings.txt 2>/dev/null; chmod 644 /var/log/rkhunter_warnings.txt 2>/dev/null; rm -f "\$\$TMP_RESULT"'
+ExecStart=/usr/local/bin/rkhunter-auto-scan.sh
 RemainAfterExit=yes
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/log /var/lib/rkhunter
+
+[Install]
+WantedBy=multi-user.target
 EOL
+
+    # Create the actual scan script with proper permissions
+    sudo mkdir -p /usr/local/bin
+    sudo tee /usr/local/bin/rkhunter-auto-scan.sh > /dev/null <<EOL
+#!/usr/bin/env bash
+set -euo pipefail
+# Automated RKHunter scan wrapper for systemd
+
+readonly WARN_FILE="/var/log/rkhunter_warnings.txt"
+readonly RESULT_FILE="\$(mktemp)"
+readonly CONKY_USER="${safe_user}"
+
+cleanup() { rm -f "\$RESULT_FILE" 2>/dev/null || true; }
+trap cleanup EXIT
+
+/usr/bin/rkhunter --update >/dev/null 2>&1 || true
+/usr/bin/rkhunter --propupd >/dev/null 2>&1 || true
+/usr/bin/rkhunter --check --sk > "\$RESULT_FILE" 2>/dev/null || true
+
+# Extract warnings for Conky
+grep -iE "(warning|alert|suspect)" "\$RESULT_FILE" > "\$WARN_FILE" 2>/dev/null || touch "\$WARN_FILE"
+chown "\${CONKY_USER}:\${CONKY_USER}" "\$WARN_FILE" 2>/dev/null || true
+chmod 644 "\$WARN_FILE" 2>/dev/null || true
+exit 0
+EOL
+    sudo chmod 750 /usr/local/bin/rkhunter-auto-scan.sh
 
     sudo tee /etc/systemd/system/rkhunter-auto.timer > /dev/null <<EOL
 [Unit]
