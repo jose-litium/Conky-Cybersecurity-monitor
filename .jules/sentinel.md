@@ -7,3 +7,8 @@
 **Vulnerability:** The dynamically generated sudoers entries in both `Conky_app-gui.sh` and `Cybersecurity-monitor-conky` allowed the defined user to execute the `conky-rkhunter-wrapper.sh` script without a password as ANY user on the system by specifying `ALL=(ALL) NOPASSWD:`.
 **Learning:** Because the purpose of `rkhunter` requires it to be executed as `root` (and `sudo` defaults to `root`), explicitly restricting the `Runas` specifier to `root` prevents edge-case privilege escalation scenarios where a user might attempt to run the script under a different context.
 **Prevention:** Always follow the Principle of Least Privilege when defining sudoers rules. Restrict the `Runas` user (the user the command runs as) specifically to the required user, which in most cases is `root` (e.g., `ALL=(root) NOPASSWD:`).
+
+## 2025-02-18 - Maintain Absolute Paths in Secure Wrappers
+**Vulnerability:** Changing explicit absolute paths (e.g., `/usr/bin/rkhunter`) to relative paths (e.g., `rkhunter`) in secure privileged wrappers (e.g. executed via sudo) opens up the script to PATH manipulation vulnerabilities where an attacker could modify the environment's `$PATH` to point to a malicious executable.
+**Learning:** Security wrappers running with elevated privileges must always use explicit, absolute paths to external binaries they execute to ensure they call the genuine system binary, regardless of environmental variable manipulations.
+**Prevention:** Do not remove absolute paths from scripts intended to act as secure boundaries or sudo wrappers. Ensure any newly created scripts intended for elevated execution also use explicit absolute paths for external commands.

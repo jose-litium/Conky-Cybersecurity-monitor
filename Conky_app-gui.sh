@@ -391,7 +391,7 @@ ExecStart=/usr/local/bin/rkhunter-auto-scan.sh
 RemainAfterExit=yes
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/var/log
+ReadWritePaths=/var/log /var/lib/rkhunter
 
 [Install]
 WantedBy=multi-user.target
