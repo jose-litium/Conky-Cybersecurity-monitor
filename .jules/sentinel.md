@@ -7,3 +7,8 @@
 **Vulnerability:** The dynamically generated sudoers entries in both `Conky_app-gui.sh` and `Cybersecurity-monitor-conky` allowed the defined user to execute the `conky-rkhunter-wrapper.sh` script without a password as ANY user on the system by specifying `ALL=(ALL) NOPASSWD:`.
 **Learning:** Because the purpose of `rkhunter` requires it to be executed as `root` (and `sudo` defaults to `root`), explicitly restricting the `Runas` specifier to `root` prevents edge-case privilege escalation scenarios where a user might attempt to run the script under a different context.
 **Prevention:** Always follow the Principle of Least Privilege when defining sudoers rules. Restrict the `Runas` user (the user the command runs as) specifically to the required user, which in most cases is `root` (e.g., `ALL=(root) NOPASSWD:`).
+
+## 2025-05-18 - Fix rkhunter alert bypass due to masked exit codes
+**Vulnerability:** The script creating the `rkhunter` wrapper executed inside Conky checked for `rkhunter --check` exit code using `if command; then`. `rkhunter` returns a non-zero exit status (e.g. 1, 2) when threats are detected, causing the `then` block to be bypassed and critical security alerts to be silently dropped.
+**Learning:** Security tools (like `rkhunter`, `chkrootkit`) often return non-zero exit codes when finding threats. Using them as direct conditionals (`if command`) will cause the logic for parsing and alerting their output to be skipped on a finding.
+**Prevention:** Always execute security scanners unconditionally (e.g. `command || true`), then independently parse the resulting log output for warnings/alerts instead of relying on the command's exit code for program flow when you intend to capture findings.
