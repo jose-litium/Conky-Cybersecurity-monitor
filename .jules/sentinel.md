@@ -7,3 +7,8 @@
 **Vulnerability:** The dynamically generated sudoers entries in both `Conky_app-gui.sh` and `Cybersecurity-monitor-conky` allowed the defined user to execute the `conky-rkhunter-wrapper.sh` script without a password as ANY user on the system by specifying `ALL=(ALL) NOPASSWD:`.
 **Learning:** Because the purpose of `rkhunter` requires it to be executed as `root` (and `sudo` defaults to `root`), explicitly restricting the `Runas` specifier to `root` prevents edge-case privilege escalation scenarios where a user might attempt to run the script under a different context.
 **Prevention:** Always follow the Principle of Least Privilege when defining sudoers rules. Restrict the `Runas` user (the user the command runs as) specifically to the required user, which in most cases is `root` (e.g., `ALL=(root) NOPASSWD:`).
+
+## 2026-08-26 - Fix silent alert dropping in RKHunter execution
+**Vulnerability:** The `rkhunter` scan command in `Conky_app-gui.sh` was executed inside an `if` condition (`if rkhunter --check; then`). Because security scanners return non-zero exit statuses when they detect threats, the `then` block (responsible for extracting and logging alerts) was bypassed whenever an actual threat was found, silently masking the alerts.
+**Learning:** Commands that intentionally return non-zero statuses to indicate findings should never be placed directly in conditional checks if their output needs to be processed unconditionally.
+**Prevention:** Always execute security scanners unconditionally (e.g., appending `|| true`) and parse the resulting log or output file afterwards instead of relying on the exit status for execution flow.
