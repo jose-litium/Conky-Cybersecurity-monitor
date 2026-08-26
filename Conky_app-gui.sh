@@ -254,23 +254,23 @@ trap cleanup EXIT
 sudo /usr/local/bin/conky-rkhunter-wrapper.sh --update >/dev/null 2>&1 || true
 sudo /usr/local/bin/conky-rkhunter-wrapper.sh --propupd >/dev/null 2>&1 || true
 
-# Run check and capture output
-if sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "$RESULT_FILE" 2>/dev/null; then
-    # Extract only warning lines for Conky display
-    grep -iE "(warning|alert|suspect)" "$RESULT_FILE" > "$WARN_FILE" 2>/dev/null || true
-    
-    # Create comparison file for change detection
-    if [[ -f "/var/log/rkhunter_warnings_prev.txt" ]]; then
-        if ! cmp -s "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt"; then
-            cp "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt"
-            echo "CHANGED" > "/var/log/rkhunter_status.txt"
-        else
-            echo "UNCHANGED" > "/var/log/rkhunter_status.txt"
-        fi
+# Run check and capture output unconditionally to avoid silently dropping alerts
+sudo /usr/local/bin/conky-rkhunter-wrapper.sh --check --sk > "$RESULT_FILE" 2>/dev/null || true
+
+# Extract only warning lines for Conky display
+grep -iE "(warning|alert|suspect)" "$RESULT_FILE" > "$WARN_FILE" 2>/dev/null || true
+
+# Create comparison file for change detection
+if [[ -f "/var/log/rkhunter_warnings_prev.txt" ]]; then
+    if ! cmp -s "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt"; then
+        cp "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt"
+        echo "CHANGED" > "/var/log/rkhunter_status.txt"
     else
-        cp "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt" 2>/dev/null || true
-        echo "INITIAL" > "/var/log/rkhunter_status.txt"
+        echo "UNCHANGED" > "/var/log/rkhunter_status.txt"
     fi
+else
+    cp "$WARN_FILE" "/var/log/rkhunter_warnings_prev.txt" 2>/dev/null || true
+    echo "INITIAL" > "/var/log/rkhunter_status.txt"
 fi
 
 # Ensure file exists even if empty (for Conky to read)
