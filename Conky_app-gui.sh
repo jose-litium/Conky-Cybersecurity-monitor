@@ -95,7 +95,7 @@ setup_sudoers() {
         return 1
     fi
     local safe_user
-    safe_user="$(printf '%q' "$USER")"
+    safe_user="$USER"
 
     local sudoers_file="/etc/sudoers.d/conky-monitor"
     local wrapper_script="/usr/local/bin/conky-rkhunter-wrapper.sh"
@@ -376,7 +376,7 @@ install_rkhunter_service() {
         return 1
     fi
     local safe_user
-    safe_user="$(printf '%q' "$USER")"
+    safe_user="$USER"
 
     # System-level service for RKHunter (requires sudo)
     sudo tee /etc/systemd/system/rkhunter-auto.service > /dev/null <<'EOL'
@@ -391,7 +391,7 @@ ExecStart=/usr/local/bin/rkhunter-auto-scan.sh
 RemainAfterExit=yes
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/var/log
+ReadWritePaths=/var/log /var/lib/rkhunter
 
 [Install]
 WantedBy=multi-user.target

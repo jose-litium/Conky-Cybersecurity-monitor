@@ -12,3 +12,8 @@
 **Vulnerability:** The `rkhunter` scan command in `Conky_app-gui.sh` was executed inside an `if` condition (`if rkhunter --check; then`). Because security scanners return non-zero exit statuses when they detect threats, the `then` block (responsible for extracting and logging alerts) was bypassed whenever an actual threat was found, silently masking the alerts.
 **Learning:** Commands that intentionally return non-zero statuses to indicate findings should never be placed directly in conditional checks if their output needs to be processed unconditionally.
 **Prevention:** Always execute security scanners unconditionally (e.g., appending `|| true`) and parse the resulting log or output file afterwards instead of relying on the exit status for execution flow.
+
+## 2025-02-18 - Fix complex inline bash commands in systemd service
+**Vulnerability:** In `Cybersecurity-monitor-conky`, the `rkhunter-auto.service` executed a complex series of commands using `ExecStart=/bin/bash -c '...'`, which included the generation and deletion of a temporary file without utilizing `trap` for secure cleanup, and failed to properly sandbox the systemd service (e.g. using `PrivateTmp=true`).
+**Learning:** Using inline `bash -c` commands in systemd services bypasses the benefits of systemd sandboxing and makes secure cleanup using patterns like `trap` extremely difficult and fragile.
+**Prevention:** Avoid using complex inline `bash -c` commands with temporary file generation in systemd `ExecStart` directives. Instead, use a dedicated standalone wrapper script to properly leverage systemd sandboxing (e.g., `PrivateTmp=true`) and `trap` for secure temporary file cleanup.
