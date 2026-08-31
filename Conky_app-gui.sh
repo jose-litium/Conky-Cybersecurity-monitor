@@ -22,8 +22,10 @@ readonly INSTALL_DIR="$HOME/.local/conky_app"
 mkdir -p "$INSTALL_DIR"
 chmod 0700 "$INSTALL_DIR"
 readonly LOGFILE="$INSTALL_DIR/conky_gui_$$_.log"
-readonly SCRIPT_NAME="$(basename "$0")"
-readonly SCRIPT_PATH="$(readlink -f "$0")"
+SCRIPT_NAME="$(basename "$0")"
+readonly SCRIPT_NAME
+SCRIPT_PATH="$(readlink -f "$0")"
+readonly SCRIPT_PATH
 
 # Track if apt update has been executed
 APT_HAS_UPDATED=""
@@ -243,7 +245,8 @@ set -euo pipefail
 
 readonly INSTALL_DIR="$HOME/.local/conky_app"
 readonly WARN_FILE="/var/log/rkhunter_warnings.txt"
-readonly RESULT_FILE="$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")"
+RESULT_FILE="$(mktemp "$INSTALL_DIR/rkhunter_result.XXXXXX")"
+readonly RESULT_FILE
 
 cleanup() {
     rm -f "$RESULT_FILE" 2>/dev/null || true
@@ -405,7 +408,8 @@ set -euo pipefail
 # Automated RKHunter scan wrapper for systemd
 
 readonly WARN_FILE="/var/log/rkhunter_warnings.txt"
-readonly RESULT_FILE="\$(mktemp)"
+RESULT_FILE="\$(mktemp)"
+readonly RESULT_FILE
 readonly CONKY_USER="${safe_user}"
 
 cleanup() { rm -f "\$RESULT_FILE" 2>/dev/null || true; }
