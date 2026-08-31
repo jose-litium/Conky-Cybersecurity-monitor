@@ -17,3 +17,8 @@
 **Vulnerability:** In `Cybersecurity-monitor-conky`, the `rkhunter-auto.service` executed a complex series of commands using `ExecStart=/bin/bash -c '...'`, which included the generation and deletion of a temporary file without utilizing `trap` for secure cleanup, and failed to properly sandbox the systemd service (e.g. using `PrivateTmp=true`).
 **Learning:** Using inline `bash -c` commands in systemd services bypasses the benefits of systemd sandboxing and makes secure cleanup using patterns like `trap` extremely difficult and fragile.
 **Prevention:** Avoid using complex inline `bash -c` commands with temporary file generation in systemd `ExecStart` directives. Instead, use a dedicated standalone wrapper script to properly leverage systemd sandboxing (e.g., `PrivateTmp=true`) and `trap` for secure temporary file cleanup.
+
+## 2025-10-24 - Fix silent exit code masking in readonly declarations
+**Vulnerability:** Combining a `readonly` declaration with command substitution (e.g., `readonly VAR="$(cmd)"`) masks the exit code of `cmd`. In scripts running under `set -e`, a failure in `cmd` (like `mktemp` failing to create a file) will be ignored, leading to execution continuing with an empty variable or unexpected state, potentially causing destructive behavior or security bypasses later in the script.
+**Learning:** In bash, `readonly` is a command itself and always returns success (exit code 0), overriding the exit code of the subshell command substitution.
+**Prevention:** To safely capture exit codes and enforce immutability without triggering 'readonly variable' errors, always assign the value first, then declare it readonly on the next line (e.g., `VAR="$(cmd)"` followed by `readonly VAR`).

@@ -292,7 +292,8 @@ set -euo pipefail
 # Automated RKHunter scan wrapper for systemd
 
 readonly WARN_FILE="/var/log/rkhunter_warnings.txt"
-readonly RESULT_FILE="\$(mktemp)"
+RESULT_FILE="\$(mktemp)"
+readonly RESULT_FILE
 readonly CONKY_USER="${safe_user}"
 
 cleanup() { rm -f "\$RESULT_FILE" 2>/dev/null || true; }
