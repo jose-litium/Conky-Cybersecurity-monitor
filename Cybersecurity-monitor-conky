@@ -371,8 +371,12 @@ install_conky() {
     create_rkhunter_scan_script
 
     echo -e "${BLUE}Configurando permisos para RKHunter...${NC}"
-    sudo chmod +r /var/log/rkhunter.log
-    sudo usermod -aG adm "$(whoami)"
+    if [[ -f /var/log/rkhunter.log ]]; then
+        sudo chmod 644 /var/log/rkhunter.log 2>/dev/null || true
+    fi
+    sudo touch /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt /var/log/rkhunter_status.txt 2>/dev/null || true
+    sudo chown "${USER}:${USER}" /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt /var/log/rkhunter_status.txt 2>/dev/null || true
+    sudo chmod 644 /var/log/rkhunter_warnings.txt /var/log/rkhunter_warnings_prev.txt /var/log/rkhunter_status.txt 2>/dev/null || true
 
     echo -e "${BLUE}Configurando sudoers para comandos de Conky...${NC}"
     if ! setup_sudoers; then
