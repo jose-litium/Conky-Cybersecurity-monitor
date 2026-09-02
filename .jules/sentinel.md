@@ -22,3 +22,8 @@
 **Vulnerability:** Combining a `readonly` declaration with command substitution (e.g., `readonly VAR="$(cmd)"`) masks the exit code of `cmd`. In scripts running under `set -e`, a failure in `cmd` (like `mktemp` failing to create a file) will be ignored, leading to execution continuing with an empty variable or unexpected state, potentially causing destructive behavior or security bypasses later in the script.
 **Learning:** In bash, `readonly` is a command itself and always returns success (exit code 0), overriding the exit code of the subshell command substitution.
 **Prevention:** To safely capture exit codes and enforce immutability without triggering 'readonly variable' errors, always assign the value first, then declare it readonly on the next line (e.g., `VAR="$(cmd)"` followed by `readonly VAR`).
+
+## 2025-02-18 - Fix overly permissive group assignment
+**Vulnerability:** In `Cybersecurity-monitor-conky`, the script granted the user broad access to the `adm` group (`sudo usermod -aG adm "$(whoami)"`) merely to resolve localized permission issues for reading RKHunter logs. The `adm` group typically grants read access to all system authorization logs (e.g., `/var/log/auth.log`, `/var/log/syslog`), creating a significant authorization bypass and privilege escalation risk.
+**Learning:** Never grant access to broad, powerful system groups (like `adm`, `wheel`, or `docker`) just to resolve localized file permission issues.
+**Prevention:** Instead, pre-create the specific required files (e.g., log files) and explicitly assign ownership (`chown`) or fine-grained ACLs to the application's user to enforce the principle of least privilege.
