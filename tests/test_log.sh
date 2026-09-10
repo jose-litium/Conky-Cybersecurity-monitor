@@ -3,19 +3,20 @@
 # Exit on any failure
 set -e
 
+# Secure temporary file creation (CWE-59 prevention and secure cleanup)
+# Use mktemp to create unpredictable filenames and trap for guaranteed cleanup
+TEST_SCRIPT="$(mktemp /tmp/Conky_app-gui-test.XXXXXX.sh)"
+LOGFILE="$(mktemp /tmp/test_conky_log.XXXXXX.log)"
+export LOGFILE
+trap 'rm -f "$TEST_SCRIPT" "$LOGFILE" 2>/dev/null || true' EXIT
+
 # Create a clean version of the script that we can source without running the UI
-cp Conky_app-gui.sh /tmp/Conky_app-gui-test.sh
-sed -i "s/^readonly LOGFILE/LOGFILE/" /tmp/Conky_app-gui-test.sh
-sed -i '/^# Main Menu (GUI with dialog)/,$d' /tmp/Conky_app-gui-test.sh
+cp Conky_app-gui.sh "$TEST_SCRIPT"
+sed -i "s/^readonly LOGFILE/LOGFILE/" "$TEST_SCRIPT"
+sed -i '/^# Main Menu (GUI with dialog)/,$d' "$TEST_SCRIPT"
 
 # Source the functions
-source /tmp/Conky_app-gui-test.sh
-
-# Use a temporary log file for testing
-export LOGFILE="/tmp/test_conky_log_$$.log"
-
-# Clean up before testing
-rm -f "$LOGFILE"
+source "$TEST_SCRIPT"
 
 echo "🧪 Running tests for logging functions..."
 
@@ -69,10 +70,6 @@ else
     cat "$LOGFILE"
     FAIL=1
 fi
-
-# Clean up
-rm -f "$LOGFILE"
-rm -f /tmp/Conky_app-gui-test.sh
 
 if [ $FAIL -eq 0 ]; then
     echo "🎉 All tests passed successfully!"
