@@ -27,3 +27,8 @@
 **Vulnerability:** In `Cybersecurity-monitor-conky`, the script granted the user broad access to the `adm` group (`sudo usermod -aG adm "$(whoami)"`) merely to resolve localized permission issues for reading RKHunter logs. The `adm` group typically grants read access to all system authorization logs (e.g., `/var/log/auth.log`, `/var/log/syslog`), creating a significant authorization bypass and privilege escalation risk.
 **Learning:** Never grant access to broad, powerful system groups (like `adm`, `wheel`, or `docker`) just to resolve localized file permission issues.
 **Prevention:** Instead, pre-create the specific required files (e.g., log files) and explicitly assign ownership (`chown`) or fine-grained ACLs to the application's user to enforce the principle of least privilege.
+
+## 2025-10-25 - Fix CWE-59 insecure predictable temporary files in test suite
+**Vulnerability:** The test script `tests/test_log.sh` used predictable temporary filenames in `/tmp/` (e.g. `/tmp/Conky_app-gui-test.sh` and `/tmp/test_conky_log_$$.log`) and relied on manual `rm -f` commands at the end of the file for cleanup, making it vulnerable to symlink attacks (CWE-59) and leaving artifacts if the script exited early.
+**Learning:** Test scripts often run with sufficient privileges or in environments where predictable temporary files in world-writable directories (like `/tmp/`) can be exploited. Furthermore, relying on manual cleanup at the end of a script fails when tests abort early due to `set -e` or signals.
+**Prevention:** Always use `mktemp` to generate unpredictable temporary file paths in bash scripts, and immediately register a `trap ... EXIT` handler to ensure guaranteed cleanup regardless of how the script terminates.
