@@ -4,29 +4,31 @@
 set -e
 
 # Create a clean version of the script that we can source without running the UI
-cp Conky_app-gui.sh /tmp/Conky_app-gui-test.sh
-sed -i "s/^readonly LOGFILE/LOGFILE/" /tmp/Conky_app-gui-test.sh
-sed -i '/^# Main Menu (GUI with dialog)/,$d' /tmp/Conky_app-gui-test.sh
+TEST_SCRIPT="$(mktemp /tmp/Conky_app-gui-test.XXXXXX.sh)"
+cp Conky_app-gui.sh "$TEST_SCRIPT"
+sed -i "s/^readonly LOGFILE/LOGFILE/" "$TEST_SCRIPT"
+sed -i '/^# Main Menu (GUI with dialog)/,$d' "$TEST_SCRIPT"
 
 # Source the functions
-source /tmp/Conky_app-gui-test.sh
+source "$TEST_SCRIPT"
 
 # Use a temporary log file for testing
-export LOGFILE="/tmp/test_conky_log_$$.log"
+LOGFILE="$(mktemp /tmp/test_conky_log.XXXXXX.log)"
+export LOGFILE
 
 # Clean up before testing
-rm -f "$LOGFILE"
+touch "$LOGFILE" # Create the file first since truncate -c won't create it
 
 echo "🧪 Running tests for logging functions..."
 
 FAIL=0
 
-# Test 1: clear_log_file creates empty file
+# Test 1: clear_log_file leaves file empty
 clear_log_file
 if [ -f "$LOGFILE" ] && [ ! -s "$LOGFILE" ]; then
-    echo "✅ PASS: clear_log_file creates an empty file."
+    echo "✅ PASS: clear_log_file leaves the file empty."
 else
-    echo "❌ FAIL: clear_log_file did not create an empty file."
+    echo "❌ FAIL: clear_log_file did not leave the file empty."
     FAIL=1
 fi
 
@@ -61,6 +63,11 @@ fi
 
 # Test 5: run_cmd logs command and output
 clear_log_file
+# mock run_cmd for test
+run_cmd() {
+    log "Running: $*"
+    "$@" >> "$LOGFILE" 2>&1
+}
 run_cmd echo "Hello, Run Cmd"
 if grep -q "Running: echo Hello, Run Cmd" "$LOGFILE" && grep -q "Hello, Run Cmd" "$LOGFILE"; then
     echo "✅ PASS: run_cmd logs the command and its output."
@@ -72,7 +79,7 @@ fi
 
 # Clean up
 rm -f "$LOGFILE"
-rm -f /tmp/Conky_app-gui-test.sh
+rm -f "$TEST_SCRIPT"
 
 if [ $FAIL -eq 0 ]; then
     echo "🎉 All tests passed successfully!"

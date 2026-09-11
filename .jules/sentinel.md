@@ -1,3 +1,8 @@
+## 2025-02-18 - Fix CWE-59 symlink vulnerabilities in test scripts
+**Vulnerability:** Test scripts used predictable filenames (e.g., `/tmp/test_conky_gui.log`) and `$PID` (e.g., `/tmp/test_conky_log_$$.log`) in world-writable directories, which introduces CWE-59 symlink vulnerabilities where an attacker can create a symlink to an arbitrary file and have the script overwrite it.
+**Learning:** Never use predictable filenames or `$PID` (`$$`) in world-writable directories like `/tmp/`.
+**Prevention:** Always use `mktemp` to securely create unpredictable files in world-writable directories.
+
 ## 2025-02-18 - Fix missing secure cleanup trap for temporary file
 **Vulnerability:** The script creating the `rkhunter` wrapper executed inside Conky used a temporary file and removed it at the end of the script manually. If the script was interrupted or exited early (e.g. `set -e` failure or kill signal), the temporary file would be left on the filesystem.
 **Learning:** Temporary files should always be removed using a secure `trap cleanup EXIT` pattern to ensure cleanup regardless of exit status. Additionally, when using unquoted heredocs (`cat <<EOF`) to write the script containing the trap, the variable in the `trap` function must be properly escaped (`\$TMP_RESULT`) to prevent premature evaluation by the parent script.
