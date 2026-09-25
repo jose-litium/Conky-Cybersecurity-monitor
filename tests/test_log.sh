@@ -4,18 +4,17 @@
 set -e
 
 # Create a clean version of the script that we can source without running the UI
-cp Conky_app-gui.sh /tmp/Conky_app-gui-test.sh
-sed -i "s/^readonly LOGFILE/LOGFILE/" /tmp/Conky_app-gui-test.sh
-sed -i '/^# Main Menu (GUI with dialog)/,$d' /tmp/Conky_app-gui-test.sh
+TEST_SCRIPT="$(mktemp /tmp/test_conky_gui.XXXXXX.sh)"
+cp Conky_app-gui.sh "$TEST_SCRIPT"
+sed -i "s/^readonly LOGFILE/LOGFILE/" "$TEST_SCRIPT"
+sed -i '/^# Main Menu (GUI with dialog)/,$d' "$TEST_SCRIPT"
 
 # Source the functions
-source /tmp/Conky_app-gui-test.sh
+source "$TEST_SCRIPT"
 
 # Use a temporary log file for testing
-export LOGFILE="/tmp/test_conky_log_$$.log"
-
-# Clean up before testing
-rm -f "$LOGFILE"
+LOGFILE="$(mktemp /tmp/test_conky_log_XXXXXX.log)"
+export LOGFILE
 
 echo "🧪 Running tests for logging functions..."
 
@@ -72,7 +71,7 @@ fi
 
 # Clean up
 rm -f "$LOGFILE"
-rm -f /tmp/Conky_app-gui-test.sh
+rm -f "$TEST_SCRIPT"
 
 if [ $FAIL -eq 0 ]; then
     echo "🎉 All tests passed successfully!"

@@ -86,6 +86,14 @@ clear_log_file() {
     truncate -s 0 -c "$LOGFILE" 2>/dev/null || true
 }
 
+run_cmd() {
+    log "Running: $*"
+    local output
+    output=$("$@" 2>&1)
+    log "$output"
+    echo "$output"
+}
+
 ########################################
 # Sudoers Configuration (Hardened)
 ########################################
