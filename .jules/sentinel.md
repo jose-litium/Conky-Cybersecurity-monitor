@@ -27,3 +27,8 @@
 **Vulnerability:** In `Cybersecurity-monitor-conky`, the script granted the user broad access to the `adm` group (`sudo usermod -aG adm "$(whoami)"`) merely to resolve localized permission issues for reading RKHunter logs. The `adm` group typically grants read access to all system authorization logs (e.g., `/var/log/auth.log`, `/var/log/syslog`), creating a significant authorization bypass and privilege escalation risk.
 **Learning:** Never grant access to broad, powerful system groups (like `adm`, `wheel`, or `docker`) just to resolve localized file permission issues.
 **Prevention:** Instead, pre-create the specific required files (e.g., log files) and explicitly assign ownership (`chown`) or fine-grained ACLs to the application's user to enforce the principle of least privilege.
+
+## 2025-02-18 - Fix CWE-377 insecure temporary files in test scripts
+**Vulnerability:** Test scripts (`tests/test_log.sh` and `test_clear_log_file.sh`) used predictable, hardcoded filenames (like `/tmp/test_conky_gui.log` and `/tmp/Conky_app-gui-test.sh`) in the world-writable `/tmp` directory. An attacker could pre-create these files as symlinks pointing to critical system files, causing the script to inadvertently overwrite them when run.
+**Learning:** Even test scripts are vulnerable to local symlink attacks if they use predictable filenames in shared directories. While testing locally, scripts are often run with elevated privileges (e.g. `sudo ./test.sh`), making this a valid privilege escalation/clobbering vector.
+**Prevention:** Never use predictable filenames in world-writable directories. Always use `mktemp` to securely generate unpredictable temporary files and directories.

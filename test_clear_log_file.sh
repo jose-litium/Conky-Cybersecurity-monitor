@@ -3,7 +3,7 @@
 # Test script for clear_log_file in Conky_app-gui.sh
 
 # Create a temporary script for testing
-TEST_SCRIPT="$(mktemp /tmp/test_conky_gui.XXXXXX.sh)"
+TEST_SCRIPT="$(mktemp)"
 trap 'rm -f "$TEST_SCRIPT" 2>/dev/null || true' EXIT
 
 # Remove readonly attribute from LOGFILE and replace exit with return for testing
@@ -13,7 +13,7 @@ sed -e 's/readonly LOGFILE/LOGFILE/g' -e 's/exit/return/g' Conky_app-gui.sh > "$
 source "$TEST_SCRIPT"
 
 # Override LOGFILE to a dummy file for testing
-LOGFILE="/tmp/test_conky_gui.log"
+LOGFILE="$(mktemp)"
 trap 'rm -f "$TEST_SCRIPT" "$LOGFILE" 2>/dev/null || true' EXIT
 
 # Create some dummy content
