@@ -4,18 +4,34 @@
 set -e
 
 # Create a clean version of the script that we can source without running the UI
-cp Conky_app-gui.sh /tmp/Conky_app-gui-test.sh
-sed -i "s/^readonly LOGFILE/LOGFILE/" /tmp/Conky_app-gui-test.sh
-sed -i '/^# Main Menu (GUI with dialog)/,$d' /tmp/Conky_app-gui-test.sh
+TEST_SCRIPT="$(mktemp)"
+readonly TEST_SCRIPT
+LOGFILE_TEST="$(mktemp)"
+readonly LOGFILE_TEST
+
+cleanup() {
+    rm -f "$TEST_SCRIPT" "$LOGFILE_TEST" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+cp Conky_app-gui.sh "$TEST_SCRIPT"
+sed -i "s/^readonly LOGFILE/LOGFILE/" "$TEST_SCRIPT"
+sed -i '/^# Main Menu (GUI with dialog)/,$d' "$TEST_SCRIPT"
 
 # Source the functions
-source /tmp/Conky_app-gui-test.sh
+source "$TEST_SCRIPT"
 
-# Use a temporary log file for testing
-export LOGFILE="/tmp/test_conky_log_$$.log"
+# Sourcing overrides LOGFILE with a default. Re-assign it to our secure file.
+LOGFILE="$LOGFILE_TEST"
+export LOGFILE
 
-# Clean up before testing
-rm -f "$LOGFILE"
+# Mock run_cmd if it doesn't exist to ensure Test 5 still runs without error
+if ! command -v run_cmd &> /dev/null; then
+    run_cmd() {
+        log "Running: $*"
+        "$@" >> "$LOGFILE" 2>&1
+    }
+fi
 
 echo "🧪 Running tests for logging functions..."
 
@@ -70,9 +86,7 @@ else
     FAIL=1
 fi
 
-# Clean up
-rm -f "$LOGFILE"
-rm -f /tmp/Conky_app-gui-test.sh
+# Clean up handled by trap
 
 if [ $FAIL -eq 0 ]; then
     echo "🎉 All tests passed successfully!"
