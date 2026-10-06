@@ -86,6 +86,11 @@ clear_log_file() {
     truncate -s 0 -c "$LOGFILE" 2>/dev/null || true
 }
 
+run_cmd() {
+    log "Running: $*"
+    "$@" 2>&1 | tee -a "$LOGFILE" > /dev/null
+}
+
 ########################################
 # Sudoers Configuration (Hardened)
 ########################################
@@ -215,7 +220,7 @@ configure_sensors() {
         if dconfirm "Do you want to run sensors-detect to automatically configure your sensors?"; then
             echo -e "${BLUE}Running sensors-detect (auto-accept defaults)...${NC}"
             # Use --auto to avoid interactive prompts, redirect output to log
-            if yes | sudo sensors-detect &>> "$LOGFILE"; then
+            if yes | sudo sensors-detect 2>&1 | sudo tee -a "$LOGFILE" >/dev/null; then
                 # Load detected modules
                 sudo modprobe -a coretemp it87 2>/dev/null || true
                 dmsg "Sensors configuration completed."
