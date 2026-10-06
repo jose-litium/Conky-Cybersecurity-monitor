@@ -27,3 +27,7 @@
 **Vulnerability:** In `Cybersecurity-monitor-conky`, the script granted the user broad access to the `adm` group (`sudo usermod -aG adm "$(whoami)"`) merely to resolve localized permission issues for reading RKHunter logs. The `adm` group typically grants read access to all system authorization logs (e.g., `/var/log/auth.log`, `/var/log/syslog`), creating a significant authorization bypass and privilege escalation risk.
 **Learning:** Never grant access to broad, powerful system groups (like `adm`, `wheel`, or `docker`) just to resolve localized file permission issues.
 **Prevention:** Instead, pre-create the specific required files (e.g., log files) and explicitly assign ownership (`chown`) or fine-grained ACLs to the application's user to enforce the principle of least privilege.
+## 2025-10-25 - Fix CWE-59 Symlink vulnerability in test scripts
+**Vulnerability:** Test scripts used predictable filenames (e.g. `/tmp/test_conky_log_$$.log` and `/tmp/test_conky_gui.log`) in world-writable directory `/tmp`.
+**Learning:** Using predictable filenames in `/tmp/` allows an attacker to pre-create the file as a symlink to overwrite arbitrary files when the script is run.
+**Prevention:** Always use `mktemp` to generate random, safe, and unpredictable temporary files.
